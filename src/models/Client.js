@@ -4,35 +4,26 @@ const Schema = mongoose.Schema;
 const clientSchema = new Schema({
   firstName: {
     type: String,
-    required: true,
+    required: false,
   },
   lastName: {
     type: String,
+    required: false,
+  },
+  resourceName: {
+    type: String,
     required: true,
+    unique: true,
   },
   email: {
-    type: String,
-    required: true,
+    type: String, // No uniqueness and can be an empty string
   },
   phone: {
-    type: String,
-    required: true,
+    type: String, // No uniqueness and can be an empty string
   },
   address: {
     type: String,
-    required: true,
-  },
-  city: {
-    type: String,
-    required: true,
-  },
-  state: {
-    type: String,
-    required: true,
-  },
-  zip: {
-    type: String,
-    required: true,
+    default: '',
   },
   invoices: {
     type: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
@@ -50,6 +41,10 @@ const clientSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
   appointments: {
     type: Array,
   },
@@ -61,11 +56,23 @@ const clientSchema = new Schema({
   },
   status: {
     type: String,
+    default: 'imported from Google',
   },
   source: {
     type: String,
+    default: 'google',
   },
 });
+
+// Custom validation to require either email or phone, but allow empty strings
+
+clientSchema.path('firstName').validate(function () {
+  return this.firstName || this.lastName;
+}, 'Either firstName or lastName must be provided.');
+
+clientSchema.path('lastName').validate(function () {
+  return this.firstName || this.lastName;
+}, 'Either firstName or lastName must be provided.');
 
 const Client = mongoose.model('Client', clientSchema);
 

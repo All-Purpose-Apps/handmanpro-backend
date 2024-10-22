@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import axios from 'axios';
 
 import express from 'express';
 import cors from 'cors';
@@ -9,18 +8,35 @@ import clientRoutes from './routes/clientRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
 import proposalRoutes from './routes/proposalRoutes.js';
 import lastSyncedRoutes from './routes/lastSyncedRoutes.js';
+import gmailRoutes from './routes/gmailRoutes.js';
+import contactsRoutes from './routes/contactsRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
+import expressListRoutes from 'express-list-routes';
+import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
 
 connectDB();
 
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: 'http://localhost:5173', // Replace with your frontend's origin
+    credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+  })
+);
+
+app.use(authenticateGoogleAPI);
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/last-synced', lastSyncedRoutes);
+app.use('/api/gmail', gmailRoutes);
+app.use('/api/google/contacts', contactsRoutes);
+app.use('/api/google/calendar', calendarRoutes);
+
+// expressListRoutes(app);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));

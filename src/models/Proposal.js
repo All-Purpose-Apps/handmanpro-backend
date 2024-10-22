@@ -58,6 +58,13 @@ const proposalSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  fileUrl: {
+    type: String,
+  },
 });
 
 const Proposal = mongoose.model('Proposal', proposalSchema);

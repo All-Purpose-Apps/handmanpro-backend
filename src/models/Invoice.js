@@ -25,19 +25,46 @@ const invoiceSchema = new Schema({
         type: String,
         required: true,
       },
-      quantity: {
-        type: Number,
-        required: true,
-      },
       rate: {
         type: Number,
         required: true,
       },
+      discount: {
+        type: Number,
+        default: 0,
+      },
     },
   ],
-  subTotal: {
+  subTotal1: {
     type: Number,
     required: true,
+  },
+  extraWorkMaterials: {
+    type: Number,
+    default: 0,
+  },
+  subTotal2: {
+    type: Number,
+    required: true,
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['cash', 'check', 'credit/debit', 'online', 'awaiting payment'],
+    default: 'awaiting payment',
+  },
+  checkNumber: {
+    type: String,
+    required: function () {
+      return this.paymentMethod === 'check';
+    },
+  },
+  creditCardFee: {
+    type: Number,
+    default: 0,
+  },
+  depositAdjustment: {
+    type: Number,
+    default: 0,
   },
   total: {
     type: Number,
@@ -45,7 +72,8 @@ const invoiceSchema = new Schema({
   },
   status: {
     type: String,
-    required: true,
+    enum: ['created', 'sent', 'viewed', 'paid', 'canceled'],
+    default: 'created',
   },
   notes: {
     type: String,
@@ -53,6 +81,13 @@ const invoiceSchema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  fileUrl: {
+    type: String,
   },
 });
 

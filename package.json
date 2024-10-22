@@ -13,6 +13,7 @@
   "author": "All-Purpose Apps <info@allpurposeapps.com> (https://www.allpurposeapps.com/)",
   "license": "MIT",
   "dependencies": {
+    "@google-cloud/storage": "^7.13.0",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
@@ -23,9 +24,11 @@
     "express": "^4.21.0",
     "express-list-routes": "^1.2.2",
     "express-mongoose-ra-json-server": "^0.2.2",
+    "googleapis": "^144.0.0",
     "helmet": "^7.1.0",
     "log4js": "^6.9.1",
     "mongoose": "^8.6.4",
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "pdf-lib": "^1.17.1"
   }
 }

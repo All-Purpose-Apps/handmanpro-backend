@@ -1,6 +1,35 @@
 import mongoose from 'mongoose';
 const Schema = mongoose.Schema;
 
+const StatusUpdateSchema = new mongoose.Schema({
+  status: {
+    type: String,
+    enum: [
+      'active',
+      'created by user',
+      'inquiry received',
+      'imported from Google',
+      'inactive',
+      'work in progress',
+      'completed',
+      'archived',
+      'invoice sent',
+      'proposal sent',
+      'appointment scheduled',
+      'task assigned',
+      'paid',
+      'canceled',
+      'follow-up',
+    ],
+    required: true,
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+    required: true,
+  },
+});
+
 const clientSchema = new Schema({
   firstName: {
     type: String,
@@ -9,6 +38,10 @@ const clientSchema = new Schema({
   lastName: {
     type: String,
     required: false,
+  },
+  name: {
+    type: String,
+    required: true,
   },
   resourceName: {
     type: String,
@@ -29,7 +62,7 @@ const clientSchema = new Schema({
     type: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
   },
   proposals: {
-    type: Array,
+    type: [{ type: Schema.Types.ObjectId, ref: 'Proposal' }],
   },
   notes: {
     type: Array,
@@ -54,9 +87,14 @@ const clientSchema = new Schema({
   tags: {
     type: Array,
   },
-  status: {
-    type: String,
-    default: 'imported from Google',
+  statusHistory: {
+    type: [StatusUpdateSchema],
+    default: [
+      {
+        status: 'imported from Google',
+        date: Date.now(),
+      },
+    ],
   },
   source: {
     type: String,

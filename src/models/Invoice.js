@@ -15,23 +15,15 @@ const invoiceSchema = new Schema({
     type: Date,
     required: true,
   },
-  dueDate: {
-    type: Date,
-    required: true,
-  },
   items: [
     {
       description: {
         type: String,
         required: true,
       },
-      rate: {
+      price: {
         type: Number,
         required: true,
-      },
-      discount: {
-        type: Number,
-        default: 0,
       },
     },
   ],
@@ -74,9 +66,6 @@ const invoiceSchema = new Schema({
     type: String,
     enum: ['created', 'sent', 'viewed', 'paid', 'canceled'],
     default: 'created',
-  },
-  notes: {
-    type: String,
   },
   createdAt: {
     type: Date,

@@ -19,39 +19,33 @@ const proposalSchema = new Schema({
     type: String,
     required: true,
   },
-  proposalDescription: {
-    type: String,
-    required: true,
-  },
   items: [
     {
       description: {
         type: String,
         required: true,
       },
-      quantity: {
+      regularPrice: {
         type: Number,
         required: true,
       },
-      rate: {
+      discountPrice: {
         type: Number,
         required: true,
       },
     },
   ],
-  subTotal: {
-    type: Number,
-    required: true,
-  },
-  total: {
+  packagePrice: {
     type: Number,
     required: true,
   },
   status: {
     type: String,
     required: true,
+    enum: ['draft', 'sent', 'accepted', 'rejected'],
+    default: 'draft',
   },
-  notes: {
+  dateAccepted: {
     type: String,
   },
   createdAt: {

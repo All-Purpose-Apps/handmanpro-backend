@@ -7,7 +7,7 @@ import Client from '../models/Client.js';
 
 const getClients = async (req, res) => {
   try {
-    const clients = await Client.find(); // Exclude passwords
+    const clients = await Client.find().populate('invoices');
     res.json(clients);
   } catch (error) {
     res.status(500).send('Server Error');
@@ -18,8 +18,8 @@ const getClients = async (req, res) => {
 // @route   POST /api/clients
 const createClient = async (req, res) => {
   try {
-    const { resourceName } = req.body;
-    const existingClient = await Client.find({ resourceName });
+    const { phone } = req.body;
+    const existingClient = await Client.find({ phone });
     if (existingClient.length > 0) {
       return res.status(400).json({ msg: 'Client already exists' });
     }
@@ -59,7 +59,7 @@ const getClient = async (req, res) => {
   const { id } = req.params;
 
   try {
-    let client = await Client.findById(id);
+    let client = await Client.findById(id).populate('invoices');
     if (!client) {
       return res.status(404).json({ msg: 'Client not found' });
     }
@@ -113,7 +113,6 @@ const syncClients = async (req, res) => {
           updateData[key] = client[key];
         }
       }
-
       // Exclude local-only fields from being overwritten
       delete updateData.status;
       delete updateData.notes;

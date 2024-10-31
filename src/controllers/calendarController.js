@@ -1,37 +1,50 @@
-// controllers/calendarController.js
-import { google } from 'googleapis';
+import axios from 'axios';
+
+const GOOGLE_CALENDAR_API_BASE_URL = 'https://www.googleapis.com/calendar/v3';
 
 export const listCalendarEvents = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
+  const authToken = req.headers.authorization;
 
-  if (!oauth2Client) {
+  if (!authToken || !authToken.startsWith('Bearer ')) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
   const calendarId = req.query.calendarId || 'primary';
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  let allEvents = [];
+  let nextPageToken = null;
 
   try {
-    const response = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    do {
+      const response = await axios.get(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
+        headers: {
+          Authorization: authToken,
+        },
+        params: {
+          singleEvents: true, // Ensure proper sorting of recurring events
+          orderBy: 'startTime',
+          timeMin: new Date('2000-01-01').toISOString(), // Fetch all past events
+          timeMax: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(), // Up to three months from today
+          maxResults: 250, // Fetch the maximum number of events per request
+          pageToken: nextPageToken, // Use the nextPageToken for pagination
+        },
+      });
 
-    const events = response.data.items || [];
-    res.json(events);
+      // Append events to the allEvents array
+      const { items, nextPageToken: token } = response.data;
+      allEvents = allEvents.concat(items);
+      nextPageToken = token; // Update the nextPageToken to fetch the next page of results
+    } while (nextPageToken); // Continue fetching until there's no nextPageToken
+
+    res.json(allEvents); // Return all the events
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
 
 export const getCalendarEvent = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
+  const authToken = req.headers.authorization;
 
-  if (!oauth2Client) {
+  if (!authToken) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
@@ -42,25 +55,24 @@ export const getCalendarEvent = async (req, res) => {
     return res.status(400).json({ msg: 'Event ID is required' });
   }
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events/${eventId}`;
 
   try {
-    const response = await calendar.events.get({
-      calendarId: calendarId,
-      eventId: eventId,
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: authToken,
+      },
     });
-
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching calendar event:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
 
 export const createCalendarEvent = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
+  const authToken = req.headers.authorization;
 
-  if (!oauth2Client) {
+  if (!authToken) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
@@ -71,34 +83,39 @@ export const createCalendarEvent = async (req, res) => {
     return res.status(400).json({ msg: 'Event data is required' });
   }
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events`;
 
   try {
-    await calendar.events.insert({
-      calendarId: calendarId,
-      resource: event,
+    await axios.post(url, event, {
+      headers: {
+        Authorization: authToken,
+        'Content-Type': 'application/json',
+      },
     });
 
-    const response = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
+    const response = await axios.get(`${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events`, {
+      headers: {
+        Authorization: authToken,
+      },
+      params: {
+        timeMin: new Date().toISOString(),
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: 'startTime',
+      },
     });
 
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
-    console.error('Error creating calendar event:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
 
 export const updateCalendarEvent = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
+  const authToken = req.headers.authorization;
 
-  if (!oauth2Client) {
+  if (!authToken) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
@@ -114,35 +131,39 @@ export const updateCalendarEvent = async (req, res) => {
     return res.status(400).json({ msg: 'Event data is required' });
   }
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events/${eventId}`;
 
   try {
-    await calendar.events.update({
-      calendarId: calendarId,
-      eventId: eventId,
-      resource: eventUpdates,
+    await axios.put(url, eventUpdates, {
+      headers: {
+        Authorization: authToken,
+        'Content-Type': 'application/json',
+      },
     });
 
-    const response = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
+    const response = await axios.get(`${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events`, {
+      headers: {
+        Authorization: authToken,
+      },
+      params: {
+        timeMin: new Date().toISOString(),
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: 'startTime',
+      },
     });
 
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
-    console.error('Error updating calendar event:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
 
 export const deleteCalendarEvent = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
+  const authToken = req.headers.authorization;
 
-  if (!oauth2Client) {
+  if (!authToken) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
@@ -153,44 +174,53 @@ export const deleteCalendarEvent = async (req, res) => {
     return res.status(400).json({ msg: 'Event ID is required' });
   }
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events/${eventId}`;
 
   try {
-    await calendar.events.delete({
-      calendarId: calendarId,
-      eventId: eventId,
+    await axios.delete(url, {
+      headers: {
+        Authorization: authToken,
+      },
     });
 
-    const response = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
+    const response = await axios.get(`${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${calendarId}/events`, {
+      headers: {
+        Authorization: authToken,
+      },
+      params: {
+        timeMin: new Date().toISOString(),
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: 'startTime',
+      },
     });
 
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
-    console.error('Error deleting calendar event:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
 
 export const listCalendars = async (req, res) => {
-  const oauth2Client = req.oauth2Client;
-  if (!oauth2Client) {
+  const authToken = req.headers.authorization;
+
+  if (!authToken) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/users/me/calendarList`;
 
   try {
-    const response = await calendar.calendarList.list();
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: authToken,
+      },
+    });
+
     const calendars = response.data.items || [];
     res.json(calendars);
   } catch (error) {
-    console.error('Error fetching calendars:', error);
-    res.status(500).send('Server Error');
+    res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };

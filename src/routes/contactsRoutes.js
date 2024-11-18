@@ -1,5 +1,5 @@
 import express from 'express';
-import { listContacts, createGoogleContact } from '../controllers/contactsController.js';
+import { listContacts, createGoogleContact, deleteContact } from '../controllers/contactsController.js';
 
 const router = express.Router();
 
@@ -9,4 +9,5 @@ router.get('/', listContacts);
 
 router.post('/', createGoogleContact);
 
+router.delete('/', deleteContact);
 export default router;

@@ -5,6 +5,9 @@ import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
 import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
 import Client from '../models/Client.js';
+import fs from 'fs-extra';
+import path from 'path';
+import fetch from 'node-fetch';
 
 export const createInvoice = async (req, res) => {
   try {
@@ -54,13 +57,39 @@ export const getInvoice = async (req, res) => {
 };
 
 // Update an invoice by ID
+// controllers/invoiceController.js
+
 export const updateInvoice = async (req, res) => {
   try {
-    const invoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).populate('client');
-    if (!invoice) {
+    const { prevClientId, newClientId } = req.query;
+    const invoiceId = req.params.id;
+    const invoiceData = req.body;
+
+    // Step 1: Replace client with new ID in invoiceData
+    invoiceData.client = newClientId;
+
+    // Update the invoice with new data and client ID
+    const updatedInvoice = await Invoice.findByIdAndUpdate(invoiceId, invoiceData, { new: true, runValidators: true }).populate('client');
+
+    if (!updatedInvoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
-    res.status(200).json(invoice);
+
+    // Step 2: Find previous client and remove invoice from their invoices array
+    if (prevClientId && prevClientId !== newClientId) {
+      await Client.findByIdAndUpdate(prevClientId, {
+        $pull: { invoices: invoiceId },
+      });
+    }
+
+    // Step 3: Add invoice to new client's invoices array
+    if (newClientId) {
+      await Client.findByIdAndUpdate(newClientId, {
+        $addToSet: { invoices: invoiceId },
+      });
+    }
+
+    res.status(200).json(updatedInvoice);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -69,10 +98,20 @@ export const updateInvoice = async (req, res) => {
 // Delete an invoice by ID
 export const deleteInvoice = async (req, res) => {
   try {
+    // Find and delete the invoice
     const invoice = await Invoice.findByIdAndDelete(req.params.id);
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
+
+    // Remove the invoice from the client's invoices array
+    const client = await Client.findById(invoice.client);
+    if (client) {
+      client.invoices.pull(invoice._id); // Remove the invoice ID from the array
+      await client.save(); // Save the updated client document
+    }
+
+    // Retrieve all invoices and populate the client field
     const invoices = await Invoice.find().populate('client');
     res.status(200).json(invoices);
   } catch (error) {
@@ -259,5 +298,54 @@ export const createInvoicePdf = async (req, res) => {
   } catch (error) {
     console.error('Error creating invoice PDF:', error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const downloadInvoicePdf = async (req, res) => {
+  try {
+    const url = Object.entries(req.query)
+      .map(([key, value]) => `${key}${value}`)
+      .join('');
+
+    if (!url) {
+      return res.status(400).send('Missing PDF URL');
+    }
+
+    const tempDir = path.resolve('temp');
+    const fileName = `invoice_${Date.now()}.pdf`;
+    const filePath = path.join(tempDir, fileName);
+
+    // Ensure the temporary directory exists
+    await fs.ensureDir(tempDir);
+
+    // Download the PDF
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const fileStream = fs.createWriteStream(filePath);
+    response.body.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      // Send the downloaded PDF to the client
+      res.sendFile(filePath, (err) => {
+        if (err) {
+          console.error('Error sending the file:', err);
+          res.status(500).send('Error sending the PDF');
+        }
+
+        // Cleanup: Remove the file after sending
+        fs.remove(filePath);
+      });
+    });
+
+    fileStream.on('error', (err) => {
+      console.error('Error writing file:', err);
+      res.status(500).send('Error downloading the PDF');
+    });
+  } catch (err) {
+    console.error('Error downloading invoice PDF:', err);
+    res.status(500).send('Internal Server Error');
   }
 };

@@ -15,10 +15,6 @@ const proposalSchema = new Schema({
     type: Date,
     required: true,
   },
-  proposalTitle: {
-    type: String,
-    required: true,
-  },
   items: [
     {
       description: {
@@ -42,7 +38,7 @@ const proposalSchema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ['draft', 'sent', 'accepted', 'rejected'],
+    enum: ['draft', 'sent to client', 'accepted', 'rejected', 'converted to invoice'],
     default: 'draft',
   },
   dateAccepted: {
@@ -58,6 +54,10 @@ const proposalSchema = new Schema({
   },
   fileUrl: {
     type: String,
+  },
+  invoiceId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Invoice',
   },
 });
 

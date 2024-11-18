@@ -3,14 +3,26 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
 import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
+import Client from '../models/Client.js';
+import mongoose from 'mongoose';
 
 // Create a new proposal
 export const createProposal = async (req, res) => {
   try {
     const proposal = new Proposal(req.body);
     await proposal.save();
-    const proposals = await Proposal.find({}).populate('client');
 
+    // Update the client's proposals array
+    const clientId = proposal.client;
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      if (client) {
+        client.proposals.push(proposal._id);
+        await client.save();
+      }
+    }
+
+    const proposals = await Proposal.find({}).populate('client');
     res.status(201).send(proposals);
   } catch (error) {
     res.status(400).send(error);
@@ -41,15 +53,52 @@ export const getProposalById = async (req, res) => {
 };
 
 // Update a proposal by ID
+
 export const updateProposal = async (req, res) => {
   try {
-    const proposal = await Proposal.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!proposal) {
-      return res.status(404).send();
+    const proposalId = req.params.id;
+    const updateData = req.body;
+
+    // Fetch the existing proposal
+    const existingProposal = await Proposal.findById(proposalId);
+    if (!existingProposal) {
+      return res.status(404).send({ message: 'Proposal not found' });
     }
+
+    // Safely retrieve client IDs
+    const oldClientId = existingProposal.client ? existingProposal.client.toString() : null;
+    const newClientId = updateData.client ? updateData.client._id.toString() : oldClientId;
+    // Update the proposal
+    const proposal = await Proposal.findByIdAndUpdate(proposalId, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    // Convert IDs to ObjectId instances
+    // const oldClientIdObj = oldClientId ? mongoose.Types.ObjectId(oldClientId) : null;
+    // const newClientIdObj = newClientId ? mongoose.Types.ObjectId(newClientId) : null;
+
+    // If the client has changed
+
+    if (oldClientId && newClientId && oldClientId !== newClientId) {
+      // Remove proposal from old client's proposals array
+      const oldClient = await Client.findById(oldClientId);
+      if (oldClient) {
+        oldClient.proposals.pull(proposalId);
+        await oldClient.save();
+      }
+      // Add proposal to new client's proposals array
+      const newClient = await Client.findById(newClientId);
+      if (newClient) {
+        newClient.proposals.push(proposalId);
+        await newClient.save();
+      }
+    }
+
     res.status(200).send(proposal);
   } catch (error) {
-    res.status(400).send(error);
+    console.error('Error updating proposal:', error);
+    res.status(400).send({ message: error.message });
   }
 };
 
@@ -60,6 +109,17 @@ export const deleteProposal = async (req, res) => {
     if (!proposal) {
       return res.status(404).send();
     }
+
+    // Remove the proposal from the client's proposals array
+    const clientId = proposal.client;
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      if (client) {
+        client.proposals.pull(proposal._id);
+        await client.save();
+      }
+    }
+
     res.status(200).send({ message: 'Proposal deleted successfully' });
   } catch (error) {
     res.status(500).send(error);
@@ -118,10 +178,13 @@ export const createProposalPdf = async (req, res) => {
     form.getTextField('Work At Email').setText(proposal.client.email || 'N/A');
 
     // **Proposal Information**
-    const proposalNumberField = form.getTextField('Invoice Number'); // Note: This is now "proposalNumber"
-    proposalNumberField.setText(proposal.proposalNumber || 'N/A');
-    proposalNumberField.updateAppearances(fontBold);
-    proposalNumberField.setAlignment(1);
+    firstPage.drawText(proposal.proposalNumber || 'N/A', {
+      x: 520,
+      y: 695,
+      size: 20,
+      font: fontBold,
+      color: rgb(0.75, 0, 0),
+    });
 
     const dateField = form.getTextField('Date');
     dateField.setText(proposal.proposalDate ? new Date(proposal.proposalDate).toLocaleDateString() : 'N/A');
@@ -129,10 +192,10 @@ export const createProposalPdf = async (req, res) => {
     dateField.setAlignment(1);
 
     // **Proposal Items**
-    let descriptionX = 60; // X position for descriptions column
-    let regularPriceX = 460; // X position for regular prices column
-    let discountPriceX = 520; // X position for discount prices column
-    let startingY = 490; // Y position for the first item (adjust as necessary)
+    let descriptionX = 40; // X position for descriptions column
+    let regularPriceX = 450; // X position for regular prices column
+    let discountPriceX = 510; // X position for discount prices column
+    let startingY = 500; // Y position for the first item (adjust as necessary)
     let lineHeight = 20; // Line height between each row
 
     // Draw the descriptions, regular prices, and discount prices on the PDF
@@ -168,12 +231,16 @@ export const createProposalPdf = async (req, res) => {
     // **Totals**
     const packagePriceField = form.getTextField('Package Price');
     packagePriceField.setText(proposal.packagePrice ? proposal.packagePrice.toFixed(2) : '0.00');
-    packagePriceField.setFontSize(12);
+    packagePriceField.setFontSize(18);
     packagePriceField.setAlignment(1);
 
     // **Additional Information**
-    form.getTextField('Customer Print Name').setText(proposal.client.name || 'N/A');
-    form.getTextField('Date Accepted').setText(proposal.dateAccepted ? new Date(proposal.dateAccepted).toLocaleDateString() : 'N/A');
+    const customerPrintName = form.getTextField('Customer Print Name');
+    customerPrintName.setText(proposal.client.name || 'N/A');
+    customerPrintName.setFontSize(16);
+    customerPrintName.setAlignment(1);
+
+    // form.getTextField('Date Accepted').setText(proposal.dateAccepted ? new Date(proposal.dateAccepted).toLocaleDateString() : 'N/A');
 
     // Signature field, if needed
     // Blank space for a manual signature

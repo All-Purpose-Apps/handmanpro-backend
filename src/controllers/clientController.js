@@ -1,6 +1,7 @@
 // controllers/clientController.js
 
 import Client from '../models/Client.js';
+import { google } from 'googleapis';
 
 // @desc    Get all clients
 // @route   GET /api/clients
@@ -28,9 +29,12 @@ const createClient = async (req, res) => {
 
     await client.save();
 
-    res.json(client);
+    const clients = await Client.find().populate('invoices').populate('proposals');
+
+    res.json(clients);
   } catch (error) {
     console.log(error);
+    pn;
     res.status(500).send(error);
   }
 };
@@ -59,7 +63,7 @@ const getClient = async (req, res) => {
   const { id } = req.params;
 
   try {
-    let client = await Client.findById(id).populate('invoices');
+    let client = await Client.findById(id).populate('invoices').populate('proposals');
     if (!client) {
       return res.status(404).json({ msg: 'Client not found' });
     }

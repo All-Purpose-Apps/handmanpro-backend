@@ -26,7 +26,12 @@ app.use(
   })
 );
 
-app.use(authenticateGoogleAPI);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/invoices/download-pdf/')) {
+    return next(); // Skip middleware for this route
+  }
+  authenticateGoogleAPI(req, res, next); // Or other middleware
+});
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/invoices', invoiceRoutes);

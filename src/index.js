@@ -21,7 +21,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: 'http://localhost:5173' || 'https://handmanpro.netlify.app', // Replace with your frontend's origin
+    origin: 'https://handmanpro.netlify.app', // Replace with your frontend's origin
     credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   })
 );

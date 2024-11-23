@@ -64,7 +64,7 @@ const invoiceSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'sent', 'paid', 'canceled'],
+    enum: ['created', 'sent', 'paid', 'canceled', 'signed and paid'],
     default: 'created',
   },
   createdAt: {
@@ -76,6 +76,12 @@ const invoiceSchema = new Schema({
     default: Date.now,
   },
   fileUrl: {
+    type: String,
+  },
+  signedPdfUrl: {
+    type: String,
+  },
+  token: {
     type: String,
   },
 });

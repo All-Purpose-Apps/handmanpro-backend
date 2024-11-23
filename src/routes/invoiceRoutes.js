@@ -8,6 +8,10 @@ import {
   deleteInvoice,
   createInvoicePdf,
   downloadInvoicePdf,
+  uploadPdfWithSignature,
+  createToken,
+  verifyToken,
+  revokeToken,
 } from '../controllers/invoiceController.js';
 
 router.get('/', getInvoices);
@@ -23,5 +27,13 @@ router.delete('/:id', deleteInvoice);
 router.post('/create-pdf', createInvoicePdf);
 
 router.get('/download-pdf/:url', downloadInvoicePdf);
+
+router.post('/upload-pdf-with-signature', uploadPdfWithSignature);
+
+router.post('/create-token', createToken);
+
+router.post('/verify-token', verifyToken);
+
+router.post('/revoke-token', revokeToken);
 
 export default router;

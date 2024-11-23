@@ -8,6 +8,8 @@ import Client from '../models/Client.js';
 import fs from 'fs-extra';
 import path from 'path';
 import fetch from 'node-fetch';
+import jwt from 'jsonwebtoken';
+import Token from '../models/Token.js';
 
 export const createInvoice = async (req, res) => {
   try {
@@ -347,5 +349,216 @@ export const downloadInvoicePdf = async (req, res) => {
   } catch (err) {
     console.error('Error downloading invoice PDF:', err);
     res.status(500).send('Internal Server Error');
+  }
+};
+
+export const uploadPdfWithSignature = async (req, res) => {
+  try {
+    const { pdfUrl, signatureImage, invoiceNumber, invoiceId } = req.body;
+
+    console.log('pdfUrl:', pdfUrl);
+    console.log('invoiceNumber:', invoiceNumber);
+    console.log('invoiceId:', invoiceId);
+
+    // Fetch the invoice and populate the client field
+    const invoice = await Invoice.findById(invoiceId).populate('client');
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    if (!pdfUrl || !signatureImage) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Remove data URL prefix if present
+    const signatureData = signatureImage.replace(/^data:image\/\w+;base64,/, '');
+
+    // Decode the Base64 string to a buffer
+    const signatureBuffer = Buffer.from(signatureData, 'base64');
+
+    // Fetch the existing PDF
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+    const pdfBytes = await response.arrayBuffer();
+
+    // Load and modify the PDF
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    console.log('PDF loaded successfully');
+
+    // Embed the signature image
+    const signatureImageEmbed = await pdfDoc.embedPng(signatureBuffer);
+    console.log('Signature image embedded');
+
+    // Determine dimensions for the signature
+    const signatureDims = signatureImageEmbed.scale(0.5);
+
+    // Get the first page of the PDF
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
+
+    // Draw the signature image on the PDF
+    firstPage.drawImage(signatureImageEmbed, {
+      x: 350, // Adjust X position as needed
+      y: 190, // Adjust Y position as needed
+      width: signatureDims.width / 5,
+      height: signatureDims.height / 5,
+    });
+    console.log('Signature drawn on PDF');
+
+    // Save the modified PDF
+    const updatedPdfBytes = await pdfDoc.save();
+    console.log('PDF saved with signature');
+
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+    // Initialize Google Cloud Storage client
+    const storage = new Storage({
+      credentials: gcsCredentials,
+    });
+    const bucketName = 'invoicesproposals';
+    const objectName = `invoices/invoice_${invoiceNumber}_signed.pdf`;
+
+    console.log('Uploading file with object name:', objectName);
+
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(Buffer.from(updatedPdfBytes), {
+      metadata: { contentType: 'application/pdf' },
+      predefinedAcl: 'publicRead',
+    });
+
+    console.log('File uploaded successfully to:', objectName);
+
+    // Update the invoice with the signed PDF URL and status
+    invoice.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+    invoice.status = 'signed and paid';
+    await invoice.save();
+
+    // Update the client's status
+    const client = invoice.client;
+    if (client) {
+      client.statusHistory.push({
+        status: 'invoice paid and signed',
+        date: new Date(),
+      });
+      await client.save();
+    }
+
+    // Revoke the token associated with the invoice
+    if (invoice.token) {
+      const tokenDoc = await Token.findById(invoice.token);
+      if (tokenDoc) {
+        tokenDoc.revoked = true;
+        await tokenDoc.save();
+      }
+    }
+
+    // Construct the public URL with cache-busting query string
+    const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+    res.json({ url: fileUrl, signedInvoice: invoice });
+  } catch (error) {
+    console.error('Error embedding signature into PDF:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const createToken = async (req, res) => {
+  try {
+    const { invoiceId, data } = req.body;
+    const { invoiceUrl } = data;
+
+    // Find the invoice by ID
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    // Prepare token data
+    const tokenData = {
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceUrl,
+      signed: false,
+    };
+
+    // Generate JWT token
+    const tokenString = jwt.sign(tokenData, process.env.JWT_SECRET_KEY, { expiresIn: '2d' });
+
+    // Create a new Token document
+    const tokenDoc = new Token({
+      token: tokenString,
+      expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Expires in 2 days
+      revoked: false,
+    });
+
+    // Save the Token document to the database
+    await tokenDoc.save();
+
+    // Update the invoice to reference the new Token document
+    invoice.token = tokenDoc._id; // Ensure your Invoice model has a 'token' field
+    await invoice.save();
+
+    // Respond with the generated token
+    res.status(200).json({ token: tokenString });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const verifyToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    // Find the token in the database
+    const tokenDoc = await Token.findOne({ token });
+    if (!tokenDoc) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    // Check if the token is revoked
+    if (tokenDoc.revoked) {
+      return res.status(401).json({ message: 'Token has been revoked' });
+    }
+
+    // Check if the token has expired
+    if (tokenDoc.expiresAt < new Date()) {
+      return res.status(401).json({ message: 'Token has expired' });
+    }
+
+    // Verify the JWT token
+    jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+
+      // Token is valid
+      res.status(200).json(decoded);
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const revokeToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    // Find the token in the database
+    const tokenDoc = await Token.findOne({ token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
+
+    // Revoke the token
+    tokenDoc.revoked = true;
+    await tokenDoc.save();
+
+    res.status(200).json({ message: 'Token revoked successfully' });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };

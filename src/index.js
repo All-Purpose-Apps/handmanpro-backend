@@ -30,6 +30,15 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api/invoices/download-pdf/')) {
     return next(); // Skip middleware for this route
   }
+
+  if (req.path.startsWith('/api/invoices/upload-pdf-with-signature')) {
+    return next(); // Skip middleware for this route
+  }
+
+  if (req.path.startsWith('/api/invoices/verify-token')) {
+    return next(); // Skip middleware for this route
+  }
+
   authenticateGoogleAPI(req, res, next); // Or other middleware
 });
 
@@ -41,7 +50,7 @@ app.use('/api/gmail', gmailRoutes);
 app.use('/api/google/contacts', contactsRoutes);
 app.use('/api/google/calendar', calendarRoutes);
 
-// expressListRoutes(app);
+expressListRoutes(app);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));

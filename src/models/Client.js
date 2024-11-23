@@ -20,7 +20,7 @@ const StatusUpdateSchema = new mongoose.Schema({
       'proposal rejected',
       'appointment scheduled',
       'task assigned',
-      'paid',
+      'invoice paid and signed',
       'canceled',
       'follow-up',
     ],

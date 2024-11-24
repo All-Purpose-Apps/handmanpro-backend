@@ -459,6 +459,7 @@ export const uploadPdfWithSignature = async (req, res) => {
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+    console.log('File URL:', fileUrl);
     res.json({ url: fileUrl, signedInvoice: invoice });
   } catch (error) {
     console.error('Error embedding signature into PDF:', error);

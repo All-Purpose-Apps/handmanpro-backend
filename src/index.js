@@ -11,6 +11,7 @@ import lastSyncedRoutes from './routes/lastSyncedRoutes.js';
 import gmailRoutes from './routes/gmailRoutes.js';
 import contactsRoutes from './routes/contactsRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import expressListRoutes from 'express-list-routes';
 import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
 
@@ -49,6 +50,7 @@ app.use('/api/last-synced', lastSyncedRoutes);
 app.use('/api/gmail', gmailRoutes);
 app.use('/api/google/contacts', contactsRoutes);
 app.use('/api/google/calendar', calendarRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 expressListRoutes(app);
 

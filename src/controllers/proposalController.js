@@ -18,6 +18,10 @@ export const createProposal = async (req, res) => {
       const client = await Client.findById(clientId);
       if (client) {
         client.proposals.push(proposal._id);
+        client.statusHistory.push({
+          status: 'proposal created',
+          date: new Date(),
+        });
         await client.save();
       }
     }

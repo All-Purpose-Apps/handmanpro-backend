@@ -62,9 +62,13 @@ const invoiceSchema = new Schema({
     type: Number,
     required: true,
   },
+  fromProposalId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Proposal',
+  },
   status: {
     type: String,
-    enum: ['created', 'sent', 'paid', 'canceled', 'signed and paid'],
+    enum: ['created', 'sent', 'paid', 'canceled', 'signed and paid', 'signed'],
     default: 'created',
   },
   createdAt: {
@@ -80,6 +84,14 @@ const invoiceSchema = new Schema({
   },
   signedPdfUrl: {
     type: String,
+  },
+  signed: {
+    type: Boolean,
+    default: false,
+  },
+  paid: {
+    type: Boolean,
+    default: false,
   },
   token: {
     type: String,

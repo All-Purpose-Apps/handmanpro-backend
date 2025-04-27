@@ -13,9 +13,17 @@ const notificationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  read: {
+  isRead: {
     type: Boolean,
     default: false,
+  },
+  type: {
+    type: String,
+    required: true,
+  },
+  id: {
+    type: String,
+    required: true,
   },
 });
 

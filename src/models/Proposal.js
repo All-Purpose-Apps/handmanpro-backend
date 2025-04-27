@@ -19,15 +19,12 @@ const proposalSchema = new Schema({
     {
       description: {
         type: String,
-        required: true,
       },
       regularPrice: {
         type: Number,
-        required: true,
       },
       discountPrice: {
         type: Number,
-        required: true,
       },
     },
   ],
@@ -58,6 +55,10 @@ const proposalSchema = new Schema({
   invoiceId: {
     type: Schema.Types.ObjectId,
     ref: 'Invoice',
+  },
+  materials: {
+    type: Schema.Types.ObjectId,
+    ref: 'MaterialsList',
   },
 });
 

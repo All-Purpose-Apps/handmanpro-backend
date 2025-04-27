@@ -32,9 +32,9 @@ export const deleteNotification = async (req, res) => {
 
 export const updateNotification = async (req, res) => {
   const { id } = req.params;
-  const { title, message, read } = req.body;
+  const { title, message, isRead } = req.body;
   try {
-    await Notification.findByIdAndUpdate(id, { title, message, read }, { new: true });
+    await Notification.findByIdAndUpdate(id, { title, message, isRead }, { new: true });
     res.json({ message: 'Notification updated successfully.' });
   } catch (error) {
     res.status(409).json({ message: error.message });
@@ -44,7 +44,7 @@ export const updateNotification = async (req, res) => {
 export const markAsRead = async (req, res) => {
   const { id } = req.params;
   try {
-    await Notification.findByIdAndUpdate(id, { read: true }, { new: true });
+    await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
     res.json({ message: 'Notification marked as read.' });
   } catch (error) {
     res.status(409).json({ message: error.message });
@@ -53,7 +53,7 @@ export const markAsRead = async (req, res) => {
 
 export const markAllAsRead = async (req, res) => {
   try {
-    await Notification.updateMany({}, { read: true });
+    await Notification.updateMany({}, { isRead: true });
     res.json({ message: 'All notifications marked as read.' });
   } catch (error) {
     res.status(409).json({ message: error.message });

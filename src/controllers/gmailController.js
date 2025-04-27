@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import axios from 'axios';
 import Client from '../models/Client.js';
 import Invoice from '../models/Invoice.js';
+import Notification from '../models/Notification.js';
 
 export const listGmailMessages = async (req, res) => {
   const oauth2Client = req.oauth2Client;
@@ -28,7 +29,6 @@ export const listGmailMessages = async (req, res) => {
 export const sendEmail = async (req, res) => {
   const oauth2Client = req.oauth2Client;
   const { to, subject, body, pdfUrl, invoice } = req.body;
-
   if (!oauth2Client) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
@@ -72,6 +72,13 @@ export const sendEmail = async (req, res) => {
       },
     });
 
+    const notification = new Notification({
+      title: 'Invoice Sent',
+      message: `Invoice ${invoice.invoiceNumber} sent to ${to}`,
+      type: 'email',
+      id: invoice._id,
+    });
+    await notification.save();
     res.status(200).json({ msg: 'Email sent successfully!' });
   } catch (error) {
     console.error('Error sending email:', error);

@@ -1,10 +1,7 @@
-// controllers/clientController.js
-
+import e from 'express';
 import Client from '../models/Client.js';
 import { google } from 'googleapis';
-
-// @desc    Get all clients
-// @route   GET /api/clients
+const people = google.people('v1');
 
 const getClients = async (req, res) => {
   try {
@@ -15,8 +12,6 @@ const getClients = async (req, res) => {
   }
 };
 
-// @desc    Create a new client
-// @route   POST /api/clients
 const createClient = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -24,7 +19,7 @@ const createClient = async (req, res) => {
     if (existingClient.length > 0) {
       return res.status(400).json({ msg: 'Client already exists' });
     }
-    // Create a new client
+
     const client = new Client(req.body);
 
     await client.save();
@@ -39,25 +34,61 @@ const createClient = async (req, res) => {
   }
 };
 
-// @desc   Update a client
-// @route  PUT /api/clients/:id
-
 const updateClient = async (req, res) => {
   const { id } = req.params;
+  const oauth2Client = req.oauth2Client;
 
   try {
     let client = await Client.findByIdAndUpdate(id, req.body, { new: true });
     if (!client) {
       return res.status(404).json({ msg: 'Client not found' });
     }
+
+    if (client.resourceName) {
+      const resourceName = client.resourceName;
+
+      const { data: existingContact } = await people.people.get({
+        auth: oauth2Client,
+        resourceName: resourceName,
+        personFields: 'names,emailAddresses,phoneNumbers,addresses',
+      });
+
+      if (!existingContact.etag) {
+        return res.status(400).json({ msg: 'Etag not found for the contact' });
+      }
+
+      const updateData = {
+        etag: existingContact.etag,
+        names: [
+          {
+            givenName: client.givenName,
+            familyName: client.familyName,
+          },
+        ],
+        emailAddresses: client.email ? [{ value: client.email }] : [],
+        phoneNumbers: client.phone ? [{ value: client.phone }] : [],
+        addresses: client.address
+          ? [
+              {
+                formattedValue: client.address,
+              },
+            ]
+          : [],
+      };
+
+      await people.people.updateContact({
+        auth: oauth2Client,
+        resourceName: resourceName,
+        updatePersonFields: 'names,emailAddresses,phoneNumbers,addresses',
+        requestBody: updateData,
+      });
+    }
     res.json(client);
   } catch (error) {
+    console.error('Error updating client:', error);
     res.status(500).send('Server Error');
   }
 };
-
-// @desc   Get a client
-// @route  GET /api/clients/:id
 
 const getClient = async (req, res) => {
   const { id } = req.params;
@@ -73,18 +104,17 @@ const getClient = async (req, res) => {
   }
 };
 
-// @desc   Delete a client
-// @route  DELETE /api/clients/:id
-
 const deleteClient = async (req, res) => {
   const { id } = req.params;
 
   try {
-    let client = await Client.findByIdAndDelete(id);
-    if (!client) {
-      return res.status(404).json({ msg: 'Client not found' });
-    }
-    res.json({ msg: 'Client deleted successfully' });
+    const invoices = await Invoice.find({ client: id });
+
+    // let client = await Client.findByIdAndDelete(id);
+    // if (!client) {
+    //   return res.status(404).json({ msg: 'Client not found' });
+    // }
+    // res.json({ msg: 'Client deleted successfully' });
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -92,32 +122,34 @@ const deleteClient = async (req, res) => {
 
 const syncClients = async (req, res) => {
   try {
-    // Fetch clients from MongoDB and Google Contacts
     const mongoClients = await Client.find();
     const googleClients = req.body;
 
-    // Extract resourceNames
     const mongoClientIds = mongoClients.map((client) => client.resourceName);
     const googleClientIds = googleClients.map((client) => client.resourceName);
 
-    // Identify clients to delete
     const resourceNamesToDelete = mongoClientIds.filter((id) => !googleClientIds.includes(id));
 
-    // Delete clients not present in Google Contacts
     if (resourceNamesToDelete.length > 0) {
+      const clientsToDelete = await Client.find({ resourceName: { $in: resourceNamesToDelete } });
+
+      const invoicesToDelete = clientsToDelete.flatMap((client) => client.invoices);
+      const proposalsToDelete = clientsToDelete.flatMap((client) => client.proposals);
+
+      await Invoice.deleteMany({ _id: { $in: invoicesToDelete } });
+      await Proposal.deleteMany({ _id: { $in: proposalsToDelete } });
+
       await Client.deleteMany({ resourceName: { $in: resourceNamesToDelete } });
     }
 
-    // Prepare bulk operations for upserting clients
     const bulkOps = googleClients.map((client) => {
-      // Build the update object by excluding empty or undefined fields
       const updateData = {};
       for (const key in client) {
         if (client[key] !== undefined && client[key] !== null && client[key] !== '') {
           updateData[key] = client[key];
         }
       }
-      // Exclude local-only fields from being overwritten
+
       delete updateData.status;
       delete updateData.notes;
 
@@ -129,8 +161,6 @@ const syncClients = async (req, res) => {
         },
       };
     });
-
-    // Execute bulk operations
     if (bulkOps.length > 0) {
       await Client.bulkWrite(bulkOps);
     }

@@ -27,7 +27,7 @@ router.delete('/:id', deleteNotification);
 
 // @route   PUT /api/notifications/markAsRead/:id
 // @desc    Mark a notification as read
-router.put('/markAsRead/:id', markAsRead);
+router.patch('/markAsRead/:id', markAsRead);
 
 // @route   PUT /api/notifications/markAllAsRead
 // @desc    Mark all notifications as read

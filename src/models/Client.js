@@ -35,11 +35,11 @@ const StatusUpdateSchema = new mongoose.Schema({
 });
 
 const clientSchema = new Schema({
-  firstName: {
+  givenName: {
     type: String,
     required: false,
   },
-  lastName: {
+  familyName: {
     type: String,
     required: false,
   },
@@ -108,12 +108,12 @@ const clientSchema = new Schema({
 
 // Custom validation to require either email or phone, but allow empty strings
 
-clientSchema.path('firstName').validate(function () {
-  return this.firstName || this.lastName;
+clientSchema.path('givenName').validate(function () {
+  return this.givenName || this.familyName;
 }, 'Either firstName or lastName must be provided.');
 
-clientSchema.path('lastName').validate(function () {
-  return this.firstName || this.lastName;
+clientSchema.path('familyName').validate(function () {
+  return this.givenName || this.lastName;
 }, 'Either firstName or lastName must be provided.');
 
 const Client = mongoose.model('Client', clientSchema);

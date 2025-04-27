@@ -10,6 +10,7 @@ import path from 'path';
 import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import Token from '../models/Token.js';
+import Notification from '../models/Notification.js';
 
 export const createInvoice = async (req, res) => {
   try {
@@ -456,6 +457,15 @@ export const uploadPdfWithSignature = async (req, res) => {
         await tokenDoc.save();
       }
     }
+
+    const notification = new Notification({
+      title: 'Invoice Signed and Paid',
+      message: `Invoice ${invoice.invoiceNumber} has been signed and paid`,
+      type: 'invoices',
+      id: invoice._id,
+    });
+
+    await notification.save();
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;

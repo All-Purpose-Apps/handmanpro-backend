@@ -27,11 +27,13 @@ export const listContacts = async (req, res) => {
       .filter((contact) => !(contact.emailAddresses && contact.emailAddresses[0].value === emailToFilterOut))
       .map((contact) => {
         const resourceName = contact.resourceName;
-        const name = contact.names ? contact.names[0].displayName : '';
+        const name = contact.names ? contact.names[0].givenName + ' ' + contact.names[0].familyName : '';
+        const givenName = contact.names ? contact.names[0].givenName : '';
+        const familyName = contact.names ? contact.names[0].familyName : '';
         const email = contact.emailAddresses ? contact.emailAddresses[0].value : '';
         const phone = contact.phoneNumbers ? contact.phoneNumbers[0].value : '';
         const address = contact.addresses ? contact.addresses[0].formattedValue : '';
-        return { resourceName, name, email, phone, address };
+        return { resourceName, name, email, phone, address, givenName, familyName };
       });
 
     res.json(formattedContacts);

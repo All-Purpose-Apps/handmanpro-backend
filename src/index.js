@@ -14,6 +14,8 @@ import calendarRoutes from './routes/calendarRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import expressListRoutes from 'express-list-routes';
 import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
+import unwrangleRoutes from './routes/unwrangleRoutes.js';
+import materialsListRoutes from './routes/materialsListRoutes.js';
 
 connectDB();
 
@@ -51,8 +53,10 @@ app.use('/api/gmail', gmailRoutes);
 app.use('/api/google/contacts', contactsRoutes);
 app.use('/api/google/calendar', calendarRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/products', unwrangleRoutes);
+app.use('/api/materials', materialsListRoutes);
 
-expressListRoutes(app);
+// expressListRoutes(app);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));

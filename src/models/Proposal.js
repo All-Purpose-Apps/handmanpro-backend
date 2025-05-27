@@ -56,10 +56,14 @@ const proposalSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Invoice',
   },
-  materials: {
-    type: Schema.Types.ObjectId,
-    ref: 'MaterialsList',
-  },
+  materials: [
+    {
+      material: String,
+      quantity: Number,
+      price: Number,
+      total: Number,
+    },
+  ],
 });
 
 const Proposal = mongoose.model('Proposal', proposalSchema);

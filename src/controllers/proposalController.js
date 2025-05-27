@@ -29,6 +29,7 @@ export const createProposal = async (req, res) => {
     const proposals = await Proposal.find({}).populate('client');
     res.status(201).send(proposals);
   } catch (error) {
+    console.log('Error creating proposal:', error);
     res.status(400).send(error);
   }
 };
@@ -108,6 +109,7 @@ export const updateProposal = async (req, res) => {
 
 // Delete a proposal by ID
 export const deleteProposal = async (req, res) => {
+  console.log('Deleting proposal with ID:', req.params.id);
   try {
     const proposal = await Proposal.findByIdAndDelete(req.params.id);
     if (!proposal) {
@@ -120,6 +122,19 @@ export const deleteProposal = async (req, res) => {
       const client = await Client.findById(clientId);
       if (client) {
         client.proposals.pull(proposal._id);
+        await client.save();
+      }
+    }
+    // Remove the proposal from the client's status history
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      console.log('Client found:', client);
+      if (client) {
+        client.proposals.push(proposal._id);
+        client.statusHistory.push({
+          status: 'proposal deleted',
+          date: new Date(),
+        });
         await client.save();
       }
     }
@@ -257,7 +272,7 @@ export const createProposalPdf = async (req, res) => {
 
     // Upload the generated PDF to Google Cloud Storage
     const bucketName = 'invoicesproposals';
-    const objectName = `proposals/proposal_${proposal.proposalNumber}.pdf`;
+    const objectName = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
 
     console.log('Uploading file with object name:', objectName);
 

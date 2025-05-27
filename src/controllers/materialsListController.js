@@ -1,4 +1,15 @@
 import MaterialsList from '../models/MaterialsList.js';
+import Materials from '../models/Materials.js';
+
+export const listOfMaterials = async (req, res) => {
+  try {
+    const materials = await Materials.find();
+    res.status(200).json(materials);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+    console.error('Error fetching materials:', error);
+  }
+};
 
 export const getMaterialsList = async (req, res) => {
   try {

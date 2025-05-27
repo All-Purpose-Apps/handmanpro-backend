@@ -8,11 +8,14 @@ import {
   updateMaterialsList,
   getMaterialsListById,
   getMaterialsListByProposal,
+  listOfMaterials,
 } from '../controllers/materialsListController.js';
 
 // @route   GET /api/materialsList
 // @desc    Get all materialsList
 router.get('/', getMaterialsList);
+
+router.get('/get-materials', listOfMaterials);
 
 // @route   POST /api/materialsList
 // @desc    Create a new materialsList

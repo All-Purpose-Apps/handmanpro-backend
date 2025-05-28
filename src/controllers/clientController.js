@@ -31,7 +31,6 @@ const createClient = async (req, res) => {
     res.json(clients);
   } catch (error) {
     console.log(error);
-    pn;
     res.status(500).send(error);
   }
 };

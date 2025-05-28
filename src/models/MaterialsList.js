@@ -3,13 +3,13 @@ const Schema = mongoose.Schema;
 
 const materialsListSchema = new Schema({
   proposal: {
-    type: Schema.Types.ObjectId,
-    ref: 'Proposal',
+    type: String,
     required: true,
+    unique: true,
   },
   materials: [
     {
-      description: {
+      material: {
         type: String,
         required: true,
       },
@@ -20,9 +20,6 @@ const materialsListSchema = new Schema({
       price: {
         type: Number,
         required: true,
-      },
-      url: {
-        type: String,
       },
     },
   ],
@@ -37,6 +34,10 @@ const materialsListSchema = new Schema({
   updatedAt: {
     type: Date,
     default: Date.now,
+  },
+  proposalId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Proposal',
   },
 });
 

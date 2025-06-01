@@ -4,6 +4,7 @@ import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
 import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
 import Client from '../models/Client.js';
+import MaterialsList from '../models/MaterialsList.js';
 import mongoose from 'mongoose';
 
 // Create a new proposal
@@ -109,11 +110,22 @@ export const updateProposal = async (req, res) => {
 
 // Delete a proposal by ID
 export const deleteProposal = async (req, res) => {
-  console.log('Deleting proposal with ID:', req.params.id);
   try {
     const proposal = await Proposal.findByIdAndDelete(req.params.id);
     if (!proposal) {
       return res.status(404).send();
+    }
+
+    // Delete associated materials list by its ID
+    const materialsListId = proposal.materialsListId;
+    if (materialsListId) {
+      console.log('Deleting associated materials list with ID:', materialsListId);
+      try {
+        await MaterialsList.findOneAndDelete({ _id: materialsListId });
+        console.log('Associated materials list deleted successfully');
+      } catch (err) {
+        console.error('Failed to delete associated materials list:', err);
+      }
     }
 
     // Remove the proposal from the client's proposals array
@@ -128,7 +140,6 @@ export const deleteProposal = async (req, res) => {
     // Remove the proposal from the client's status history
     if (clientId) {
       const client = await Client.findById(clientId);
-      console.log('Client found:', client);
       if (client) {
         client.proposals.push(proposal._id);
         client.statusHistory.push({
@@ -137,6 +148,24 @@ export const deleteProposal = async (req, res) => {
         });
         await client.save();
       }
+    }
+
+    // Delete associated proposal file from GCS
+    try {
+      const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+      const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+      const storage = new Storage({ credentials: gcsCredentials });
+      const bucketName = 'invoicesproposals';
+
+      if (proposal.proposalNumber && proposal.client?.name) {
+        const filePath = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
+        const file = storage.bucket(bucketName).file(filePath);
+        await file.delete();
+        console.log('Proposal PDF deleted from GCS:', filePath);
+      }
+    } catch (err) {
+      console.error('Error deleting proposal PDF from GCS:', err);
     }
 
     res.status(200).send({ message: 'Proposal deleted successfully' });
@@ -171,6 +200,7 @@ export const createProposalPdf = async (req, res) => {
 
     // Fetch the proposal and populate the client information
     const proposal = req.body.proposal;
+    const materialList = await MaterialsList.findOne({ _id: proposal.materialsListId }).populate('materials.material', 'name price');
 
     // Get the form from the PDF template and fill it with proposal data
     const form = pdfDoc.getForm();
@@ -245,6 +275,29 @@ export const createProposalPdf = async (req, res) => {
         font: fontRegular,
         color: rgb(0, 0, 0),
       });
+    });
+
+    firstPage.drawText('Materials', {
+      x: descriptionX,
+      y: startingY - proposal.items.length * lineHeight,
+      size: 16,
+      font: fontRegular,
+      color: rgb(0, 0, 0),
+    });
+
+    firstPage.drawText(materialList.total ? materialList.total.toFixed(2) : '0.00', {
+      x: regularPriceX,
+      y: startingY - proposal.items.length * lineHeight,
+      size: 16,
+      font: fontRegular,
+      color: rgb(0, 0, 0),
+    });
+    firstPage.drawText(materialList.discountTotal ? materialList.discountTotal.toFixed(2) : '0.00', {
+      x: discountPriceX,
+      y: startingY - proposal.items.length * lineHeight,
+      size: 16,
+      font: fontRegular,
+      color: rgb(0, 0, 0),
     });
 
     // **Totals**

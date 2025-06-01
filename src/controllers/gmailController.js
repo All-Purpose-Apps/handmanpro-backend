@@ -3,6 +3,7 @@ import axios from 'axios';
 import Client from '../models/Client.js';
 import Invoice from '../models/Invoice.js';
 import Notification from '../models/Notification.js';
+import Proposal from '../models/Proposal.js';
 
 export const listGmailMessages = async (req, res) => {
   const oauth2Client = req.oauth2Client;
@@ -29,6 +30,7 @@ export const listGmailMessages = async (req, res) => {
 export const sendEmail = async (req, res) => {
   const oauth2Client = req.oauth2Client;
   const { to, subject, body, pdfUrl, invoice } = req.body;
+
   if (!oauth2Client) {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
@@ -102,6 +104,88 @@ export const sendEmail = async (req, res) => {
       console.log('Client statusHistory, invoice status, and updatedAt fields updated successfully.');
     } catch (updateError) {
       console.error('Error updating client or invoice status and updatedAt:', updateError);
+    }
+  }
+};
+
+export const sendProposal = async (req, res) => {
+  const oauth2Client = req.oauth2Client;
+  const { to, subject, body, pdfUrl, proposal } = req.body;
+
+  if (!oauth2Client) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+
+  try {
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Fetch PDF from URL and encode it in base64
+    const pdfResponse = await axios.get(pdfUrl, { responseType: 'arraybuffer' });
+    const pdfBase64 = Buffer.from(pdfResponse.data).toString('base64');
+
+    // Construct email with PDF attachment
+    const email = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: multipart/mixed; boundary="boundary"',
+      '',
+      '--boundary',
+      'Content-Type: text/html; charset="UTF-8"',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      body,
+      '',
+      '--boundary',
+      'Content-Type: application/pdf',
+      'Content-Disposition: attachment; filename="proposal.pdf"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      pdfBase64,
+      '--boundary--',
+    ].join('\n');
+
+    const encodedEmail = Buffer.from(email).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+
+    // Send the email
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedEmail,
+      },
+    });
+
+    const notification = new Notification({
+      title: 'Proposal Sent',
+      message: `Proposal ${proposal.proposalNumber} sent to ${to}`,
+      type: 'email',
+      id: proposal._id,
+    });
+    await notification.save();
+    res.status(200).json({ msg: 'Email sent successfully!' });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ msg: 'Failed to send email', error: error.message });
+  } finally {
+    try {
+      const updateTimestamp = { updatedAt: new Date() };
+
+      // Update client's statusHistory and updatedAt
+      await Client.findByIdAndUpdate(proposal.client._id, {
+        $push: { statusHistory: { status: 'proposal sent', date: updateTimestamp.updatedAt } },
+        ...updateTimestamp,
+      });
+
+      // Update proposal status to "sent" and updatedAt
+      console.log(proposal._id);
+      await Proposal.findByIdAndUpdate(proposal._id, {
+        status: 'sent to client',
+        ...updateTimestamp,
+      });
+
+      console.log('Client statusHistory, proposal status, and updatedAt fields updated successfully.');
+    } catch (updateError) {
+      console.error('Error updating client or proposal status and updatedAt:', updateError);
     }
   }
 };

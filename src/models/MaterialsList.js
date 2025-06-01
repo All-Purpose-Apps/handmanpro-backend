@@ -21,10 +21,19 @@ const materialsListSchema = new Schema({
         type: Number,
         required: true,
       },
+      total: {
+        type: Number,
+        required: true,
+      },
     },
   ],
   total: {
     type: Number,
+    required: true,
+  },
+  discountTotal: {
+    type: Number,
+    default: 0,
     required: true,
   },
   createdAt: {

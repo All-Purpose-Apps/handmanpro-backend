@@ -12,6 +12,7 @@ import gmailRoutes from './routes/gmailRoutes.js';
 import contactsRoutes from './routes/contactsRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import filesRoutes from './routes/filesRoutes.js';
 import expressListRoutes from 'express-list-routes';
 import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
 import unwrangleRoutes from './routes/unwrangleRoutes.js';
@@ -55,6 +56,7 @@ app.use('/api/google/calendar', calendarRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/products', unwrangleRoutes);
 app.use('/api/materials', materialsListRoutes);
+app.use('/api/files', filesRoutes);
 
 // expressListRoutes(app);
 

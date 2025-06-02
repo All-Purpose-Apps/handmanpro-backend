@@ -107,19 +107,31 @@ export const updateInvoice = async (req, res) => {
 
 // Delete an invoice by ID
 export const deleteInvoice = async (req, res) => {
+  let invoice;
   try {
     // Find and delete the invoice
-    const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    invoice = await Invoice.findById(req.params.id);
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
 
-    // Remove the invoice from the client's invoices array
+    // Mark invoice status as "deleted"
+    invoice.status = 'deleted';
+    await invoice.save();
+
+    // Remove the invoice from the client's invoices array and update status
     const client = await Client.findById(invoice.client);
     if (client) {
-      client.invoices.pull(invoice._id); // Remove the invoice ID from the array
-      await client.save(); // Save the updated client document
+      client.invoices.pull(invoice._id);
+      client.statusHistory.push({
+        status: 'invoice deleted',
+        date: new Date(),
+      });
+      await client.save();
     }
+
+    // Delete the invoice document
+    await Invoice.findByIdAndDelete(req.params.id);
 
     // Retrieve all invoices and populate the client field
     const invoices = await Invoice.find().populate('client');
@@ -468,7 +480,7 @@ export const uploadPdfWithSignature = async (req, res) => {
     const client = invoice.client;
     if (client) {
       client.statusHistory.push({
-        status: 'invoice paid and signed',
+        status: 'invoice signed',
         date: new Date(),
       });
       await client.save();

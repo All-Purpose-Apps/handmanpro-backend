@@ -136,6 +136,13 @@ export const deleteProposal = async (req, res) => {
           console.error('Error deleting proposal PDF from GCS:', err.message);
         });
       }
+      if (proposal.signedPdfUrl) {
+        const signedFilePath = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}_signed.pdf`;
+        const signedFile = storage.bucket(bucketName).file(signedFilePath);
+        await signedFile.delete().catch((err) => {
+          console.error('Error deleting signed proposal PDF from GCS:', err.message);
+        });
+      }
     } catch (err) {
       console.error('GCS cleanup failed:', err.message);
     }
@@ -541,7 +548,7 @@ export const uploadProposalWithSignature = async (req, res) => {
 
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
-    const objectName = `proposals/proposal_${proposalNumber}_signed.pdf`;
+    const objectName = `proposals/proposal_${proposalNumber}_${proposal.client.name}_signed.pdf`;
 
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(objectName);

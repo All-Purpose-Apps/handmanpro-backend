@@ -110,7 +110,7 @@ export const deleteInvoice = async (req, res) => {
   let invoice;
   try {
     // Find and delete the invoice
-    invoice = await Invoice.findById(req.params.id);
+    invoice = await Invoice.findById(req.params.id).populate('client');
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
@@ -146,13 +146,15 @@ export const deleteInvoice = async (req, res) => {
 
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
-    console.log('Deleting invoice PDF from GCS...');
-    console.log('Invoice:', invoice);
     if (invoice.invoiceNumber && invoice.client?.name) {
       const filePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
       const file = storage.bucket(bucketName).file(filePath);
       await file.delete();
-      console.log('invoice PDF deleted from GCS:', filePath);
+    }
+    if (invoice.signedPdfUrl) {
+      const signedFilePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
+      const signedFile = storage.bucket(bucketName).file(signedFilePath);
+      await signedFile.delete();
     }
   } catch (err) {
     console.error('Error deleting invoice PDF from GCS:', err);
@@ -457,7 +459,7 @@ export const uploadPdfWithSignature = async (req, res) => {
       credentials: gcsCredentials,
     });
     const bucketName = 'invoicesproposals';
-    const objectName = `invoices/invoice_${invoiceNumber}_signed.pdf`;
+    const objectName = `invoices/invoice_${invoiceNumber}_${invoice.client.name}_signed.pdf`;
 
     console.log('Uploading file with object name:', objectName);
 
@@ -506,7 +508,6 @@ export const uploadPdfWithSignature = async (req, res) => {
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
-    console.log('File URL:', fileUrl);
     res.json({ url: fileUrl, signedInvoice: invoice });
   } catch (error) {
     console.error('Error embedding signature into PDF:', error);

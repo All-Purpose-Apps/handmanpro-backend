@@ -52,6 +52,9 @@ const proposalSchema = new Schema({
   fileUrl: {
     type: String,
   },
+  signedPdfUrl: {
+    type: String,
+  },
   invoiceId: {
     type: Schema.Types.ObjectId,
     ref: 'Invoice',

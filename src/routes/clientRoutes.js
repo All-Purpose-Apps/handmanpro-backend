@@ -1,7 +1,7 @@
 // routes/clientRoutes.js
 import express from 'express';
 const router = express.Router();
-import { getClients, createClient, updateClient, getClient, deleteClient, syncClients } from '../controllers/clientController.js';
+import { getClients, createClient, updateClient, getClient, deleteClient, syncClients, clearClientStatusHistory } from '../controllers/clientController.js';
 
 // @route   GET /api/clients
 // @desc    Get all clients
@@ -23,5 +23,8 @@ router.get('/:id', getClient);
 // @route   DELETE /api/clients/:id
 // @desc    Delete a client
 router.delete('/:id', deleteClient);
+
+// @route   POST /api/clients/clear-status-history
+router.post('/clear-status-history', clearClientStatusHistory);
 
 export default router;

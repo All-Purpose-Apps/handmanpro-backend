@@ -1,6 +1,18 @@
 import express from 'express';
 const router = express.Router();
-import { getAllProposals, createProposal, updateProposal, getProposalById, deleteProposal, createProposalPdf } from '../controllers/proposalController.js';
+import {
+  getAllProposals,
+  createProposal,
+  updateProposal,
+  getProposalById,
+  deleteProposal,
+  createProposalPdf,
+  createProposalToken,
+  verifyProposalToken,
+  revokeProposalToken,
+  downloadProposalPdf,
+  uploadProposalWithSignature,
+} from '../controllers/proposalController.js';
 
 router.get('/', getAllProposals);
 
@@ -13,5 +25,13 @@ router.put('/:id', updateProposal);
 router.delete('/:id', deleteProposal);
 
 router.post('/create-pdf', createProposalPdf);
+
+// Proposal Token and PDF routes
+router.post('/create-token', createProposalToken);
+router.post('/verify-token', verifyProposalToken);
+router.post('/revoke-token', revokeProposalToken);
+
+router.get('/download-pdf/:url', downloadProposalPdf);
+router.post('/upload-pdf-with-signature', uploadProposalWithSignature);
 
 export default router;

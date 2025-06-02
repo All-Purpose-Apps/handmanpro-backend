@@ -174,4 +174,26 @@ const syncClients = async (req, res) => {
   }
 };
 
-export { getClients, createClient, updateClient, getClient, deleteClient, syncClients };
+const clearClientStatusHistory = async (req, res) => {
+  console.log('Clearing client status history');
+  const { clientId } = req.body;
+  if (!clientId) {
+    return res.status(400).json({ msg: 'Client ID is required' });
+  }
+  try {
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ msg: 'Client not found' });
+    }
+    client.statusHistory = client.statusHistory.filter(
+      (entry) => entry.status?.toLowerCase() === 'created by user' || entry.status?.toLowerCase() === 'imported from google'
+    );
+    await client.save();
+    res.json({ msg: 'Client status history cleared except for creation/import entries' });
+  } catch (error) {
+    console.error('Error clearing client status history:', error);
+    res.status(500).send('Server Error');
+  }
+};
+
+export { getClients, createClient, updateClient, getClient, deleteClient, syncClients, clearClientStatusHistory };

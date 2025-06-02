@@ -48,10 +48,12 @@ export const updateMaterialInList = async (req, res) => {
   console.log('Updating material with ID:', id, 'Name:', name, 'Price:', price);
 
   try {
-    const updatedMaterial = await Materials.findByIdAndUpdate(id, { name, price }, { new: true });
-    if (!updatedMaterial) {
+    const existingMaterial = await Materials.findById(id);
+    if (!existingMaterial) {
       return res.status(404).json({ message: 'Material not found.' });
     }
+
+    const updatedMaterial = await Materials.findByIdAndUpdate(id, { name, price }, { new: true });
     res.status(200).json(updatedMaterial);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -78,11 +80,19 @@ export const createMaterialsList = async (req, res) => {
 
 export const getMaterialsListByProposalNumber = async (req, res) => {
   const { proposal } = req.params;
+
+  if (!proposal || proposal === 'null') {
+    console.warn('getMaterialsListByProposalNumber: Missing or invalid proposal identifier.');
+    return res.status(200).json(null);
+  }
+
   try {
     const materialsList = await MaterialsList.findOne({ proposal: proposal }).populate('materials.material', 'name price').populate('proposalId', 'title');
+
     if (!materialsList) {
-      return res.status(404).json({ message: 'Materials list not found for this proposal.' });
+      return res.status(200).json(null);
     }
+
     res.status(200).json(materialsList);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -93,6 +103,12 @@ export const getMaterialsListByProposalNumber = async (req, res) => {
 export const updateMaterialsList = async (req, res) => {
   const { id } = req.params;
   console.log('Updating materials list for proposal:', id);
+
+  if (!id || id === 'null') {
+    console.warn('updateMaterialsList: Missing or invalid ID, returning empty result.');
+    return res.status(200).json(null);
+  }
+
   const { materials, total, discountTotal } = req.body;
 
   try {
@@ -108,11 +124,23 @@ export const updateMaterialsList = async (req, res) => {
     console.error('Error updating materials list:', error);
   }
 };
+
 export const deleteMaterialsList = async (req, res) => {
-  const { proposal } = req.params;
+  const { id } = req.params;
+
+  if (!id || id === 'null') {
+    console.warn('deleteMaterialsList: Missing or invalid ID, returning empty result.');
+    return res.status(200).json(null);
+  }
+
+  // Ensure the id is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    console.warn('deleteMaterialsList: Invalid ObjectId format, returning empty result.');
+    return res.status(200).json(null);
+  }
 
   try {
-    const deletedMaterialsList = await MaterialsList.findOneAndDelete({ proposal: proposal });
+    const deletedMaterialsList = await MaterialsList.findByIdAndDelete(id);
 
     if (!deletedMaterialsList) {
       return res.status(404).json({ message: 'Materials list not found for this proposal.' });
@@ -128,14 +156,20 @@ export const deleteMaterialsList = async (req, res) => {
 export const getMaterialsListById = async (req, res) => {
   const { id } = req.params;
 
+  if (!id || id === 'null') {
+    return res.status(200).json(null);
+  }
+
   try {
     const materialsList = await MaterialsList.findById(id).populate('materials.material', 'name price').populate('proposalId', 'title');
+
     if (!materialsList) {
-      return res.status(404).json({ message: 'Materials list not found.' });
+      return res.status(200).json(null);
     }
+
     res.status(200).json(materialsList);
   } catch (error) {
-    res.status(500).json({ message: error.message });
     console.error('Error fetching materials list by ID:', error);
+    return res.status(500).json({ message: error.message });
   }
 };

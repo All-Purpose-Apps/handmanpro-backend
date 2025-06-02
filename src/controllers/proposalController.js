@@ -1,4 +1,6 @@
 import Proposal from '../models/Proposal.js';
+import Token from '../models/Token.js';
+import jwt from 'jsonwebtoken';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
@@ -6,6 +8,10 @@ import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
 import Client from '../models/Client.js';
 import MaterialsList from '../models/MaterialsList.js';
 import mongoose from 'mongoose';
+import fs from 'fs-extra';
+import path from 'path';
+import fetch from 'node-fetch';
+import Notification from '../models/Notification.js';
 
 // Create a new proposal
 export const createProposal = async (req, res) => {
@@ -115,68 +121,56 @@ export const deleteProposal = async (req, res) => {
     if (!proposal) {
       return res.status(404).send();
     }
+
+    // Attempt to delete proposal PDF from GCS
     try {
       const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
       const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
-
       const storage = new Storage({ credentials: gcsCredentials });
       const bucketName = 'invoicesproposals';
 
       if (proposal.proposalNumber && proposal.client?.name) {
         const filePath = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
         const file = storage.bucket(bucketName).file(filePath);
-        await file.delete();
-        console.log('Proposal PDF deleted from GCS:', filePath);
+        await file.delete().catch((err) => {
+          console.error('Error deleting proposal PDF from GCS:', err.message);
+        });
       }
     } catch (err) {
-      console.error('Error deleting proposal PDF from GCS:', err);
+      console.error('GCS cleanup failed:', err.message);
     }
 
-    res.status(200).send({ message: 'Proposal deleted successfully' });
+    // Delete the proposal document itself
+    await Proposal.findByIdAndDelete(req.params.id);
+
+    // Delete associated materials list if exists
+    if (proposal.materialsListId) {
+      try {
+        await MaterialsList.findByIdAndDelete(proposal.materialsListId);
+        console.log('Associated materials list deleted');
+      } catch (err) {
+        console.error('Error deleting materials list:', err.message);
+      }
+    }
+
+    // Remove the proposal from the client's proposals array and update status history
+    if (proposal.client) {
+      const client = await Client.findById(proposal.client);
+      if (client) {
+        client.proposals.pull(proposal._id);
+        client.statusHistory.push({
+          status: 'proposal deleted',
+          date: new Date(),
+        });
+        await client.save();
+      }
+    }
+
+    return res.status(200).send({ message: 'Proposal deleted successfully' });
   } catch (error) {
-    res.status(500).send(error);
+    console.error('Unhandled error in deleteProposal:', error.message);
+    return res.status(500).send({ error: error.message });
   }
-
-  // Delete the proposal
-  await Proposal.findByIdAndDelete(req.params.id);
-  res.status(200).send({ message: 'Proposal deleted successfully' });
-  console.log('Proposal deleted successfully:', proposal._id);
-
-  // Delete associated materials list by its ID
-  const materialsListId = proposal.materialsListId;
-  if (materialsListId) {
-    console.log('Deleting associated materials list with ID:', materialsListId);
-    try {
-      await MaterialsList.findOneAndDelete({ _id: materialsListId });
-      console.log('Associated materials list deleted successfully');
-    } catch (err) {
-      console.error('Failed to delete associated materials list:', err);
-    }
-  }
-
-  // Remove the proposal from the client's proposals array
-  const clientId = proposal.client;
-  if (clientId) {
-    const client = await Client.findById(clientId);
-    if (client) {
-      client.proposals.pull(proposal._id);
-      await client.save();
-    }
-  }
-  // Remove the proposal from the client's status history
-  if (clientId) {
-    const client = await Client.findById(clientId);
-    if (client) {
-      client.proposals.push(proposal._id);
-      client.statusHistory.push({
-        status: 'proposal deleted',
-        date: new Date(),
-      });
-      await client.save();
-    }
-  }
-
-  // Delete associated proposal file from GCS
 };
 
 export const createProposalPdf = async (req, res) => {
@@ -361,6 +355,236 @@ export const createProposalPdf = async (req, res) => {
     res.json({ url: fileUrl });
   } catch (error) {
     console.error('Error creating proposal PDF:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- Token-related functions for proposals ---
+export const createProposalToken = async (req, res) => {
+  try {
+    const { proposalId, data } = req.body;
+    const { proposalUrl } = data;
+
+    const proposal = await Proposal.findById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+
+    const tokenData = {
+      proposalId: proposal._id,
+      proposalNumber: proposal.proposalNumber,
+      proposalUrl,
+      signed: false,
+    };
+
+    const tokenString = jwt.sign(tokenData, process.env.JWT_SECRET_KEY, { expiresIn: '2d' });
+
+    const tokenDoc = new Token({
+      token: tokenString,
+      expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      revoked: false,
+    });
+
+    await tokenDoc.save();
+
+    proposal.token = tokenDoc._id;
+    await proposal.save();
+
+    res.status(200).json({ token: tokenString });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const verifyProposalToken = async (req, res) => {
+  console.log('Verifying proposal token with body:', req.body);
+  try {
+    const { token } = req.body;
+
+    const tokenDoc = await Token.findOne({ token });
+    if (!tokenDoc) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    if (tokenDoc.revoked) {
+      return res.status(401).json({ message: 'Token has been revoked' });
+    }
+
+    if (tokenDoc.expiresAt < new Date()) {
+      return res.status(401).json({ message: 'Token has expired' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+      res.status(200).json(decoded);
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const revokeProposalToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const tokenDoc = await Token.findOne({ token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
+
+    tokenDoc.revoked = true;
+    await tokenDoc.save();
+
+    res.status(200).json({ message: 'Token revoked successfully' });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Download a signed proposal PDF from a URL and serve it to the client
+export const downloadProposalPdf = async (req, res) => {
+  console.log('Downloading proposal PDF with query:', req.query);
+  try {
+    const url = Object.entries(req.query)
+      .map(([key, value]) => `${key}${value}`)
+      .join('');
+
+    if (!url) {
+      return res.status(400).send('Missing PDF URL');
+    }
+
+    const tempDir = path.resolve('temp');
+    const fileName = `proposal_${Date.now()}.pdf`;
+    const filePath = path.join(tempDir, fileName);
+
+    await fs.ensureDir(tempDir);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const fileStream = fs.createWriteStream(filePath);
+    response.body.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      res.sendFile(filePath, (err) => {
+        if (err) {
+          console.error('Error sending the file:', err);
+          res.status(500).send('Error sending the PDF');
+        }
+        fs.remove(filePath);
+      });
+    });
+
+    fileStream.on('error', (err) => {
+      console.error('Error writing file:', err);
+      res.status(500).send('Error downloading the PDF');
+    });
+  } catch (err) {
+    console.error('Error downloading proposal PDF:', err);
+    res.status(500).send('Internal Server Error');
+  }
+};
+
+// Embed a signature into a proposal PDF and re-upload it to Google Cloud Storage
+export const uploadProposalWithSignature = async (req, res) => {
+  try {
+    const { pdfUrl, signatureImage, proposalNumber, proposalId } = req.body;
+
+    const proposal = await Proposal.findById(proposalId).populate('client');
+    if (!proposal) {
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+
+    if (!pdfUrl || !signatureImage) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    const now = new Date();
+    const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+    proposal.dateAccepted = formattedDate;
+    const signatureData = signatureImage.replace(/^data:image\/\w+;base64,/, '');
+    const signatureBuffer = Buffer.from(signatureData, 'base64');
+
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+
+    const signatureImageEmbed = await pdfDoc.embedPng(signatureBuffer);
+    const signatureDims = signatureImageEmbed.scale(0.5);
+    const firstPage = pdfDoc.getPages()[0];
+
+    firstPage.drawImage(signatureImageEmbed, {
+      x: 350,
+      y: 220,
+      width: signatureDims.width / 5,
+      height: signatureDims.height / 5,
+    });
+
+    firstPage.drawText(proposal.dateAccepted, {
+      x: 380,
+      y: 165,
+      size: 14,
+      color: rgb(0, 0, 0),
+      font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+    });
+
+    const updatedPdfBytes = await pdfDoc.save();
+
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+    const storage = new Storage({ credentials: gcsCredentials });
+    const bucketName = 'invoicesproposals';
+    const objectName = `proposals/proposal_${proposalNumber}_signed.pdf`;
+
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(Buffer.from(updatedPdfBytes), {
+      metadata: { contentType: 'application/pdf' },
+      predefinedAcl: 'publicRead',
+    });
+
+    proposal.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+    proposal.status = 'accepted';
+    await proposal.save();
+
+    if (proposal.token) {
+      const tokenDoc = await Token.findById(proposal.token);
+      if (tokenDoc) {
+        tokenDoc.revoked = true;
+        await tokenDoc.save();
+      }
+    }
+
+    // update the client status history
+    const client = await Client.findById(proposal.client);
+    if (client) {
+      client.statusHistory.push({
+        status: 'proposal signed',
+        date: new Date(),
+      });
+      await client.save();
+    }
+
+    const notification = new Notification({
+      title: 'Proposal Signed',
+      message: `Proposal ${proposal.proposalNumber} has been signed`,
+      type: 'proposals',
+      id: proposal._id,
+    });
+
+    await notification.save();
+
+    res.json({ url: proposal.signedPdfUrl, signedProposal: proposal });
+  } catch (error) {
+    console.error('Error embedding signature into proposal PDF:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -43,6 +43,18 @@ app.use((req, res, next) => {
     return next(); // Skip middleware for this route
   }
 
+  if (req.path.startsWith('/api/proposals/verify-token')) {
+    return next(); // Skip middleware for this route
+  }
+
+  if (req.path.startsWith('/api/proposals/download-pdf/')) {
+    return next(); // Skip middleware for this route
+  }
+
+  if (req.path.startsWith('/api/proposals/upload-pdf-with-signature')) {
+    return next(); // Skip middleware for this route
+  }
+
   authenticateGoogleAPI(req, res, next); // Or other middleware
 });
 

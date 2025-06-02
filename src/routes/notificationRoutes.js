@@ -7,6 +7,7 @@ import {
   updateNotification,
   markAsRead,
   markAllAsRead,
+  clearNotifications,
 } from '../controllers/notificationController.js';
 
 // @route   GET /api/notifications
@@ -32,5 +33,9 @@ router.patch('/markAsRead/:id', markAsRead);
 // @route   PUT /api/notifications/markAllAsRead
 // @desc    Mark all notifications as read
 router.put('/markAllAsRead', markAllAsRead);
+
+// @route   DELETE /api/notifications/clear
+// @desc    Clear all notifications
+router.delete('/clear', clearNotifications);
 
 export default router;

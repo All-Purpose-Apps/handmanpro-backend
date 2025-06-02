@@ -59,3 +59,12 @@ export const markAllAsRead = async (req, res) => {
     res.status(409).json({ message: error.message });
   }
 };
+
+export const clearNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({});
+    res.json({ message: 'All notifications cleared.' });
+  } catch (error) {
+    res.status(409).json({ message: error.message });
+  }
+};

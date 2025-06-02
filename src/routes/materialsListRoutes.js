@@ -10,6 +10,7 @@ import {
   addMaterialToList,
   deleteMaterialFromList,
   updateMaterialInList,
+  deleteMaterialsList,
 } from '../controllers/materialsListController.js';
 
 router.get('/get-materials', listOfMaterials);
@@ -27,5 +28,7 @@ router.post('/add-material-to-list', addMaterialToList);
 router.delete('/delete-material-from-list/:id', deleteMaterialFromList);
 
 router.put('/update-material-in-list/:id', updateMaterialInList);
+
+router.delete('/delete-materials-list/:id', deleteMaterialsList);
 
 export default router;

@@ -24,6 +24,13 @@ export const createInvoice = async (req, res) => {
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
+    if (client) {
+      client.statusHistory.push({
+        status: 'invoice created',
+        date: new Date(),
+      });
+      await client.save();
+    }
 
     // Step 3: Attach the invoice to the client's list of invoices
     client.invoices.push(invoice._id);
@@ -127,7 +134,8 @@ export const deleteInvoice = async (req, res) => {
 
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
-
+    console.log('Deleting invoice PDF from GCS...');
+    console.log('Invoice:', invoice);
     if (invoice.invoiceNumber && invoice.client?.name) {
       const filePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
       const file = storage.bucket(bucketName).file(filePath);

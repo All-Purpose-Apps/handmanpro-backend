@@ -120,6 +120,23 @@ export const deleteInvoice = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+
+  try {
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+    const storage = new Storage({ credentials: gcsCredentials });
+    const bucketName = 'invoicesproposals';
+
+    if (invoice.invoiceNumber && invoice.client?.name) {
+      const filePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
+      const file = storage.bucket(bucketName).file(filePath);
+      await file.delete();
+      console.log('invoice PDF deleted from GCS:', filePath);
+    }
+  } catch (err) {
+    console.error('Error deleting invoice PDF from GCS:', err);
+  }
 };
 
 export const createInvoicePdf = async (req, res) => {
@@ -272,7 +289,7 @@ export const createInvoicePdf = async (req, res) => {
 
     // Upload the generated PDF to Google Cloud Storage
     const bucketName = 'invoicesproposals';
-    const objectName = `invoices/invoice_${invoice.invoiceNumber}.pdf`;
+    const objectName = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
 
     console.log('Uploading file with object name:', objectName);
 
@@ -436,7 +453,7 @@ export const uploadPdfWithSignature = async (req, res) => {
 
     // Update the invoice with the signed PDF URL and status
     invoice.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
-    invoice.status = 'signed and paid';
+    invoice.status = 'signed';
     await invoice.save();
 
     // Update the client's status
@@ -459,8 +476,8 @@ export const uploadPdfWithSignature = async (req, res) => {
     }
 
     const notification = new Notification({
-      title: 'Invoice Signed and Paid',
-      message: `Invoice ${invoice.invoiceNumber} has been signed and paid`,
+      title: 'Invoice Signed',
+      message: `Invoice ${invoice.invoiceNumber} has been signed`,
       type: 'invoices',
       id: invoice._id,
     });

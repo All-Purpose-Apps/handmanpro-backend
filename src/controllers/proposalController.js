@@ -111,46 +111,10 @@ export const updateProposal = async (req, res) => {
 // Delete a proposal by ID
 export const deleteProposal = async (req, res) => {
   try {
-    const proposal = await Proposal.findByIdAndDelete(req.params.id);
+    const proposal = await Proposal.findById(req.params.id).populate('client');
     if (!proposal) {
       return res.status(404).send();
     }
-
-    // Delete associated materials list by its ID
-    const materialsListId = proposal.materialsListId;
-    if (materialsListId) {
-      console.log('Deleting associated materials list with ID:', materialsListId);
-      try {
-        await MaterialsList.findOneAndDelete({ _id: materialsListId });
-        console.log('Associated materials list deleted successfully');
-      } catch (err) {
-        console.error('Failed to delete associated materials list:', err);
-      }
-    }
-
-    // Remove the proposal from the client's proposals array
-    const clientId = proposal.client;
-    if (clientId) {
-      const client = await Client.findById(clientId);
-      if (client) {
-        client.proposals.pull(proposal._id);
-        await client.save();
-      }
-    }
-    // Remove the proposal from the client's status history
-    if (clientId) {
-      const client = await Client.findById(clientId);
-      if (client) {
-        client.proposals.push(proposal._id);
-        client.statusHistory.push({
-          status: 'proposal deleted',
-          date: new Date(),
-        });
-        await client.save();
-      }
-    }
-
-    // Delete associated proposal file from GCS
     try {
       const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
       const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -172,6 +136,47 @@ export const deleteProposal = async (req, res) => {
   } catch (error) {
     res.status(500).send(error);
   }
+
+  // Delete the proposal
+  await Proposal.findByIdAndDelete(req.params.id);
+  res.status(200).send({ message: 'Proposal deleted successfully' });
+  console.log('Proposal deleted successfully:', proposal._id);
+
+  // Delete associated materials list by its ID
+  const materialsListId = proposal.materialsListId;
+  if (materialsListId) {
+    console.log('Deleting associated materials list with ID:', materialsListId);
+    try {
+      await MaterialsList.findOneAndDelete({ _id: materialsListId });
+      console.log('Associated materials list deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete associated materials list:', err);
+    }
+  }
+
+  // Remove the proposal from the client's proposals array
+  const clientId = proposal.client;
+  if (clientId) {
+    const client = await Client.findById(clientId);
+    if (client) {
+      client.proposals.pull(proposal._id);
+      await client.save();
+    }
+  }
+  // Remove the proposal from the client's status history
+  if (clientId) {
+    const client = await Client.findById(clientId);
+    if (client) {
+      client.proposals.push(proposal._id);
+      client.statusHistory.push({
+        status: 'proposal deleted',
+        date: new Date(),
+      });
+      await client.save();
+    }
+  }
+
+  // Delete associated proposal file from GCS
 };
 
 export const createProposalPdf = async (req, res) => {
@@ -200,8 +205,11 @@ export const createProposalPdf = async (req, res) => {
 
     // Fetch the proposal and populate the client information
     const proposal = req.body.proposal;
-    const materialList = await MaterialsList.findOne({ _id: proposal.materialsListId }).populate('materials.material', 'name price');
+    let materialList = null;
 
+    if (proposal.materialsListId) {
+      materialList = await MaterialsList.findOne({ _id: proposal.materialsListId }).populate('materials.material', 'name price');
+    }
     // Get the form from the PDF template and fill it with proposal data
     const form = pdfDoc.getForm();
     const pages = pdfDoc.getPages();
@@ -276,30 +284,30 @@ export const createProposalPdf = async (req, res) => {
         color: rgb(0, 0, 0),
       });
     });
+    if (materialList) {
+      firstPage.drawText('Materials', {
+        x: descriptionX,
+        y: startingY - proposal.items.length * lineHeight,
+        size: 16,
+        font: fontRegular,
+        color: rgb(0, 0, 0),
+      });
 
-    firstPage.drawText('Materials', {
-      x: descriptionX,
-      y: startingY - proposal.items.length * lineHeight,
-      size: 16,
-      font: fontRegular,
-      color: rgb(0, 0, 0),
-    });
-
-    firstPage.drawText(materialList.total ? materialList.total.toFixed(2) : '0.00', {
-      x: regularPriceX,
-      y: startingY - proposal.items.length * lineHeight,
-      size: 16,
-      font: fontRegular,
-      color: rgb(0, 0, 0),
-    });
-    firstPage.drawText(materialList.discountTotal ? materialList.discountTotal.toFixed(2) : '0.00', {
-      x: discountPriceX,
-      y: startingY - proposal.items.length * lineHeight,
-      size: 16,
-      font: fontRegular,
-      color: rgb(0, 0, 0),
-    });
-
+      firstPage.drawText(materialList.total ? materialList.total.toFixed(2) : '0.00', {
+        x: regularPriceX,
+        y: startingY - proposal.items.length * lineHeight,
+        size: 16,
+        font: fontRegular,
+        color: rgb(0, 0, 0),
+      });
+      firstPage.drawText(materialList.discountTotal ? materialList.discountTotal.toFixed(2) : '0.00', {
+        x: discountPriceX,
+        y: startingY - proposal.items.length * lineHeight,
+        size: 16,
+        font: fontRegular,
+        color: rgb(0, 0, 0),
+      });
+    }
     // **Totals**
     const packagePriceField = form.getTextField('Package Price');
     packagePriceField.setText(proposal.packagePrice ? proposal.packagePrice.toFixed(2) : '0.00');

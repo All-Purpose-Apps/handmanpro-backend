@@ -3,7 +3,9 @@ import Materials from '../models/Materials.js';
 
 export const listOfMaterials = async (req, res) => {
   try {
+    console.log('Fetching all materials from the database...');
     const materials = await Materials.find();
+    console.log('Fetched materials:', materials);
     res.status(200).json(materials);
   } catch (error) {
     res.status(404).json({ message: error.message });

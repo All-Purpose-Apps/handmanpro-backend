@@ -65,6 +65,7 @@ export const clearNotifications = async (req, res) => {
     await Notification.deleteMany({});
     res.json({ message: 'All notifications cleared.' });
   } catch (error) {
+    console.error('Error clearing notifications:', error);
     res.status(409).json({ message: error.message });
   }
 };

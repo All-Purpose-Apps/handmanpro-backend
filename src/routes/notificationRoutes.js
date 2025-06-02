@@ -18,14 +18,6 @@ router.get('/', getNotifications);
 // @desc    Create a new notification
 router.post('/', createNotification);
 
-// @route   PUT /api/notifications/:id
-// @desc    Update a notification
-router.put('/:id', updateNotification);
-
-// @route   DELETE /api/notifications/:id
-// @desc    Delete a notification
-router.delete('/:id', deleteNotification);
-
 // @route   PUT /api/notifications/markAsRead/:id
 // @desc    Mark a notification as read
 router.patch('/markAsRead/:id', markAsRead);

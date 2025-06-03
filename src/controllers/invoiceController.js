@@ -79,8 +79,24 @@ export const updateInvoice = async (req, res) => {
     invoiceData.client = newClientId;
 
     // Update the invoice with new data and client ID
-    const updatedInvoice = await Invoice.findByIdAndUpdate(invoiceId, invoiceData, { new: true, runValidators: true }).populate('client');
 
+    const updatedInvoice = await Invoice.findByIdAndUpdate(invoiceId, invoiceData, { new: true, runValidators: true }).populate('client');
+    const client = await Client.findById(updatedInvoice.client._id);
+    if (invoiceData.status === 'signed and paid') {
+      client.statusHistory.push({
+        status: 'invoice signed and paid',
+        date: new Date(),
+      });
+      invoiceData.updateAt = new Date();
+      await client.save();
+      const notification = new Notification({
+        title: 'Invoice Signed and Paid',
+        message: `Invoice ${updatedInvoice.invoiceNumber} has been signed and paid`,
+        type: 'invoices',
+        id: updatedInvoice._id,
+      });
+      await notification.save();
+    }
     if (!updatedInvoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
@@ -101,6 +117,7 @@ export const updateInvoice = async (req, res) => {
 
     res.status(200).json(updatedInvoice);
   } catch (error) {
+    console.error('Error updating invoice:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -114,10 +131,6 @@ export const deleteInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
-
-    // Mark invoice status as "deleted"
-    invoice.status = 'deleted';
-    await invoice.save();
 
     // Remove the invoice from the client's invoices array and update status
     const client = await Client.findById(invoice.client);

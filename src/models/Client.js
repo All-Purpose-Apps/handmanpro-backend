@@ -19,7 +19,7 @@ const StatusUpdateSchema = new mongoose.Schema({
       'invoice created',
       'invoice deleted',
       'invoice paid',
-      'invoice paid and signed',
+      'invoice signed and paid',
       'invoice signed',
       'invoice sent',
       'invoice rejected',

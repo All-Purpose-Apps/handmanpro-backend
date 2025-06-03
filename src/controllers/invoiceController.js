@@ -79,7 +79,6 @@ export const updateInvoice = async (req, res) => {
     invoiceData.client = newClientId;
 
     // Update the invoice with new data and client ID
-
     const updatedInvoice = await Invoice.findByIdAndUpdate(invoiceId, invoiceData, { new: true, runValidators: true }).populate('client');
     const client = await Client.findById(updatedInvoice.client._id);
     if (invoiceData.status === 'signed and paid') {
@@ -101,11 +100,14 @@ export const updateInvoice = async (req, res) => {
       return res.status(404).json({ message: 'Invoice not found' });
     }
 
+    let clientChanged = false;
+
     // Step 2: Find previous client and remove invoice from their invoices array
     if (prevClientId && prevClientId !== newClientId) {
       await Client.findByIdAndUpdate(prevClientId, {
         $pull: { invoices: invoiceId },
       });
+      clientChanged = true;
     }
 
     // Step 3: Add invoice to new client's invoices array
@@ -113,6 +115,16 @@ export const updateInvoice = async (req, res) => {
       await Client.findByIdAndUpdate(newClientId, {
         $addToSet: { invoices: invoiceId },
       });
+    }
+
+    // Step 4: If client was changed, update status to 'created'
+    if (clientChanged) {
+      updatedInvoice.status = 'created';
+      client.statusHistory.push({
+        status: 'invoice created',
+        date: new Date(),
+      });
+      await updatedInvoice.save();
     }
 
     res.status(200).json(updatedInvoice);

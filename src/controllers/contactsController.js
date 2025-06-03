@@ -1,7 +1,21 @@
 import { google } from 'googleapis';
+import { Storage } from '@google-cloud/storage';
 import Client from '../models/Client.js';
 import Invoice from '../models/Invoice.js';
 import Proposal from '../models/Proposal.js';
+import Notification from '../models/Notification.js';
+
+const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+const storage = new Storage({
+  credentials: gcsCredentials,
+});
+const bucketName = 'invoicesproposals'; // Replace with your bucket name
+
+const extractFilenameFromUrl = (url) => {
+  return url.replace('https://storage.googleapis.com/invoicesproposals/', '').split('?')[0];
+};
 
 export const listContacts = async (req, res) => {
   const oauth2Client = req.oauth2Client;
@@ -97,17 +111,57 @@ export const deleteContact = async (req, res) => {
       resourceName: resourceName,
     });
 
-    // Delete the client from MongoDB and retrieve it
+    // // Delete the client from MongoDB and retrieve it
     const client = await Client.findOneAndDelete({ _id: id });
     if (!client) {
       return res.status(404).json({ msg: 'Client not found in MongoDB' });
     }
 
     // Delete all invoices associated with the client
-    await Invoice.deleteMany({ client: client._id });
+    const invoices = await Invoice.find({ client: client._id });
+    for (const invoice of invoices) {
+      // Remove the fileUrl from the invoice
+      if (invoice.fileUrl) {
+        const filename = extractFilenameFromUrl(invoice.fileUrl);
+        console.log(`Deleting file: ${filename}`);
+        const file = storage.bucket(bucketName).file(filename);
+        await file.delete();
+      }
 
-    // Delete all proposals associated with the client
-    await Proposal.deleteMany({ client: client._id });
+      if (invoice.signedPdfUrl) {
+        const filename = extractFilenameFromUrl(invoice.signedPdfUrl);
+        console.log(`Deleting file: ${filename}`);
+        const signedFile = storage.bucket(bucketName).file(filename);
+        await signedFile.delete();
+      }
+      await Invoice.deleteOne({ _id: invoice._id });
+    }
+    const proposals = await Proposal.find({ client: client._id });
+
+    for (const proposal of proposals) {
+      if (proposal.fileUrl) {
+        const filename = extractFilenameFromUrl(proposal.fileUrl);
+        const file = storage.bucket(bucketName).file(filename);
+        console.log(`Deleting file: ${filename}`);
+        await file.delete();
+      }
+      if (proposal.signedPdfUrl) {
+        const filename = extractFilenameFromUrl(proposal.signedPdfUrl);
+        const signedFile = storage.bucket(bucketName).file(filename);
+        console.log(`Deleting file: ${filename}`);
+
+        await signedFile.delete();
+      }
+      await Proposal.deleteOne({ _id: proposal._id });
+    }
+
+    const notification = new Notification({
+      title: 'Contact Deleted',
+      message: `Contact ${client.name} has been deleted along with associated invoices and proposals.`,
+      type: 'contacts',
+      id: client._id,
+    });
+    await notification.save();
 
     res.json({ msg: 'Contact, client, invoices, and proposals deleted successfully' });
   } catch (error) {

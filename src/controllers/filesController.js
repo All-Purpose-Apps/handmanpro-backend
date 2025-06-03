@@ -1,4 +1,8 @@
-import { Storage } from '@google-cloud/storage';
+import { Storage } from '@google-cloud/storage'; // Function to delete a file from the bucket
+import Invoice from '../models/Invoice.js';
+import Client from '../models/Client.js';
+import Notification from '../models/Notification.js';
+import Proposal from '../models/Proposal.js';
 
 // Load GCS credentials from environment variable (same as proposalController.js)
 const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
@@ -54,5 +58,88 @@ export const getFilesFromBucket = async (req, res) => {
   } catch (error) {
     console.error('Error listing files from bucket:', error.message);
     res.status(500).json({ error: 'Failed to list files from bucket' });
+  }
+};
+
+export const deleteFileFromBucket = async (req, res) => {
+  const { filename } = req.query;
+  console.log('Deleting file:', filename);
+  try {
+    const file = storage.bucket(bucketName).file(filename);
+    const fileUrl = `https://storage.googleapis.com/${bucketName}/${filename}`;
+
+    await file.delete();
+
+    // Find invoices referencing this file
+    const invoices = await Invoice.find({
+      $or: [{ fileUrl: { $regex: fileUrl } }, { signedPdfUrl: { $regex: fileUrl } }],
+    });
+    const proposals = await Proposal.find({
+      $or: [{ fileUrl: { $regex: fileUrl } }, { signedPdfUrl: { $regex: fileUrl } }],
+    });
+
+    for (const invoice of invoices) {
+      // Remove the fileUrl from the invoice
+      invoice.fileUrl = '';
+      await invoice.save();
+
+      const client = await Client.findById(invoice.client);
+      if (client) {
+        client.statusHistory.push({
+          status: 'invoice created',
+          date: new Date(),
+        });
+        await client.save();
+        const notification = new Notification({
+          title: 'Invoice File Deleted',
+          message: `Invoice ${invoice.invoiceNumber} file has been deleted from storage`,
+          type: 'invoices',
+          id: invoice._id,
+        });
+        await notification.save();
+      }
+    }
+
+    for (const proposal of proposals) {
+      // Remove the fileUrl from the proposal
+      proposal.fileUrl = '';
+      await proposal.save();
+
+      const client = await Client.findById(proposal.client);
+      if (client) {
+        client.statusHistory.push({
+          status: 'proposal created',
+          date: new Date(),
+        });
+        await client.save();
+        const notification = new Notification({
+          title: 'Proposal File Deleted',
+          message: `Proposal ${proposal.proposalNumber} file has been deleted from storage`,
+          type: 'proposals',
+          id: proposal._id,
+        });
+        await notification.save();
+      }
+    }
+
+    res.status(200).json({ message: 'File deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting file from bucket:', error.message);
+    res.status(500).json({ error: 'Failed to delete file from bucket' });
+  }
+};
+// function to rename a file in the bucket
+export const renameFileInBucket = async (req, res) => {
+  console.log(req.body);
+  const { oldFileName, newFileName } = req.body;
+  console.log('Renaming file:', oldFileName, 'to', newFileName);
+
+  try {
+    const file = storage.bucket(bucketName).file(oldFileName);
+    await file.move(newFileName);
+    res.status(200).json({ message: 'File renamed successfully' });
+  } catch (error) {
+    console.error('Error renaming file in bucket:', error.message);
+    res.status(500).json({ error: 'Failed to rename file in bucket' });
   }
 };

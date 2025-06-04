@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { Schema } from 'mongoose';
 
-const Appointment = new Schema({
+const appointmentSchema = new Schema({
   client: {
     type: Schema.Types.ObjectId,
     ref: 'Client',
@@ -40,4 +40,6 @@ const Appointment = new Schema({
   },
 });
 
-export default mongoose.model('Appointment', Appointment);
+const Appointment = mongoose.model('Appointment', appointmentSchema);
+
+export default Appointment;

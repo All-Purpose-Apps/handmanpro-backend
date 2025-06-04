@@ -1,4 +1,3 @@
-import e from 'express';
 import Invoice from '../models/Invoice.js';
 import Proposal from '../models/Proposal.js';
 import Client from '../models/Client.js';

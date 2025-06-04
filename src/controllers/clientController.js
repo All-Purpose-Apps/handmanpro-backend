@@ -1,10 +1,16 @@
-import Invoice from '../models/Invoice.js';
-import Proposal from '../models/Proposal.js';
-import Client from '../models/Client.js';
 import { google } from 'googleapis';
+import { getTenantDb } from '../config/db.js';
+import clientSchema from '../models/Client.js';
+import invoiceSchema from '../models/Invoice.js';
+import proposalSchema from '../models/Proposal.js';
 const people = google.people('v1');
 
 const getClients = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   try {
     const clients = await Client.find().populate('invoices');
     res.json(clients);
@@ -14,6 +20,11 @@ const getClients = async (req, res) => {
 };
 
 const createClient = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   try {
     const { phone } = req.body;
     const existingClient = await Client.find({ phone });
@@ -35,6 +46,11 @@ const createClient = async (req, res) => {
 };
 
 const updateClient = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   const { id } = req.params;
   const oauth2Client = req.oauth2Client;
 
@@ -91,6 +107,11 @@ const updateClient = async (req, res) => {
 };
 
 const getClient = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   const { id } = req.params;
 
   try {
@@ -105,6 +126,11 @@ const getClient = async (req, res) => {
 };
 
 const deleteClient = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   const { id } = req.params;
 
   try {
@@ -121,6 +147,11 @@ const deleteClient = async (req, res) => {
 };
 
 const syncClients = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   try {
     const mongoClients = await Client.find();
     const googleClients = req.body;
@@ -174,6 +205,11 @@ const syncClients = async (req, res) => {
 };
 
 const clearClientStatusHistory = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+
   console.log('Clearing client status history');
   const { clientId } = req.body;
   if (!clientId) {

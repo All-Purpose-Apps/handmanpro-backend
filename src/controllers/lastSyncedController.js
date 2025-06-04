@@ -1,6 +1,9 @@
-import LastSynced from '../models/LastSynced.js';
+import { getTenantDb } from '../config/db.js';
+import lastSyncedSchema from '../models/LastSynced.js';
 
 const getLastSynced = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const LastSynced = db.models.LastSynced || db.model('LastSynced', lastSyncedSchema);
   try {
     const lastSynced = await LastSynced.find();
     if (lastSynced.length === 0) {
@@ -16,6 +19,8 @@ const getLastSynced = async (req, res) => {
 };
 
 const updateLastSynced = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const LastSynced = db.models.LastSynced || db.model('LastSynced', lastSyncedSchema);
   const { id } = req.params;
   try {
     const updateSync = Date.now();

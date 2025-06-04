@@ -1,6 +1,9 @@
-import Notification from '../models/Notification.js';
+import { getTenantDb } from '../config/db.js';
+import notificationSchema from '../models/Notification.js';
 
 export const getNotifications = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     const notifications = await Notification.find();
     res.status(200).json(notifications);
@@ -10,6 +13,8 @@ export const getNotifications = async (req, res) => {
 };
 
 export const createNotification = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const notification = req.body;
   const newNotification = new Notification(notification);
   try {
@@ -21,6 +26,8 @@ export const createNotification = async (req, res) => {
 };
 
 export const deleteNotification = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const { id } = req.params;
   try {
     await Notification.findByIdAndRemove(id);
@@ -31,6 +38,8 @@ export const deleteNotification = async (req, res) => {
 };
 
 export const updateNotification = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const { id } = req.params;
   const { title, message, isRead } = req.body;
   try {
@@ -42,6 +51,8 @@ export const updateNotification = async (req, res) => {
 };
 
 export const markAsRead = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const { id } = req.params;
   try {
     await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
@@ -52,6 +63,8 @@ export const markAsRead = async (req, res) => {
 };
 
 export const markAllAsRead = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     await Notification.updateMany({}, { isRead: true });
     res.json({ message: 'All notifications marked as read.' });
@@ -61,6 +74,8 @@ export const markAllAsRead = async (req, res) => {
 };
 
 export const clearNotifications = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     await Notification.deleteMany({});
     res.json({ message: 'All notifications cleared.' });

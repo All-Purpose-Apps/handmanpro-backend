@@ -50,6 +50,4 @@ const materialsListSchema = new Schema({
   },
 });
 
-const MaterialsList = mongoose.model('MaterialsList', materialsListSchema);
-
-export default MaterialsList;
+export default materialsListSchema;

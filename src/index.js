@@ -1,9 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import mongoose from 'mongoose';
 
 import express from 'express';
 import cors from 'cors';
-import connectDB from './config/db.js';
+// import connectDB from './config/db.js';
 import clientRoutes from './routes/clientRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
 import proposalRoutes from './routes/proposalRoutes.js';
@@ -18,9 +19,14 @@ import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
 import unwrangleRoutes from './routes/unwrangleRoutes.js';
 import materialsListRoutes from './routes/materialsListRoutes.js';
 
-connectDB();
+// connectDB();
 
 const app = express();
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(

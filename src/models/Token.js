@@ -6,5 +6,4 @@ const TokenSchema = new mongoose.Schema({
   revoked: { type: Boolean, default: false }, // Flag for revocation
 });
 
-const Token = mongoose.model('Token', TokenSchema);
-export default Token;
+export default mongoose.models.Token || mongoose.model('Token', TokenSchema);

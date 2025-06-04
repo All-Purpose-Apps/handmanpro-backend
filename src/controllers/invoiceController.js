@@ -1,18 +1,22 @@
-import Invoice from '../models/Invoice.js';
+import { getTenantDb } from '../config/db.js';
+import invoiceSchema from '../models/Invoice.js';
 import { google } from 'googleapis';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
 import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
-import Client from '../models/Client.js';
+import clientSchema from '../models/Client.js';
 import fs from 'fs-extra';
 import path from 'path';
 import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import Token from '../models/Token.js';
-import Notification from '../models/Notification.js';
+import notificationSchema from '../models/Notification.js';
 
 export const createInvoice = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Client = db.models.Client || db.model('Client', clientSchema);
   try {
     // Step 1: Create and save the new invoice
     const invoice = new Invoice(req.body);
@@ -45,6 +49,8 @@ export const createInvoice = async (req, res) => {
 
 // Get all invoices
 export const getInvoices = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   try {
     const invoices = await Invoice.find().populate('client');
     res.status(200).json(invoices);
@@ -55,6 +61,8 @@ export const getInvoices = async (req, res) => {
 
 // Get a single invoice by ID
 export const getInvoice = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   try {
     const invoice = await Invoice.findById(req.params.id).populate('client');
     if (!invoice) {
@@ -70,6 +78,10 @@ export const getInvoice = async (req, res) => {
 // controllers/invoiceController.js
 
 export const updateInvoice = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     const { prevClientId, newClientId } = req.query;
     const invoiceId = req.params.id;
@@ -136,6 +148,9 @@ export const updateInvoice = async (req, res) => {
 
 // Delete an invoice by ID
 export const deleteInvoice = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Client = db.models.Client || db.model('Client', clientSchema);
   let invoice;
   try {
     // Find and delete the invoice
@@ -370,6 +385,21 @@ export const createInvoicePdf = async (req, res) => {
 
 export const downloadInvoicePdf = async (req, res) => {
   try {
+    // Extract tenantId from the token before loading the invoice model
+    const token = req.headers.authorization?.split(' ')[1];
+    const tokenDoc = await Token.findOne({ token: token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    const tenantId = decoded.tenantId;
+    const db = await getTenantDb(tenantId);
+
     const url = Object.entries(req.query)
       .map(([key, value]) => `${key}${value}`)
       .join('');
@@ -418,6 +448,22 @@ export const downloadInvoicePdf = async (req, res) => {
 };
 
 export const uploadPdfWithSignature = async (req, res) => {
+  // Use token-based tenant ID extraction, matching proposalController.js
+  const token = req.body.token || req.headers.authorization?.split(' ')[1];
+  const tokenDoc = await Token.findOne({ token: token });
+  if (!tokenDoc) {
+    return res.status(404).json({ message: 'Token not found' });
+  }
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+  const tenantId = decoded.tenantId;
+  const db = await getTenantDb(tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     const { pdfUrl, signatureImage, invoiceNumber, invoiceId } = req.body;
 
@@ -541,6 +587,8 @@ export const uploadPdfWithSignature = async (req, res) => {
 };
 
 export const createToken = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   try {
     const { invoiceId, data } = req.body;
     const { invoiceUrl } = data;
@@ -553,6 +601,7 @@ export const createToken = async (req, res) => {
 
     // Prepare token data
     const tokenData = {
+      tenantId: req.tenantId,
       invoiceId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
       invoiceUrl,
@@ -586,33 +635,48 @@ export const createToken = async (req, res) => {
 export const verifyToken = async (req, res) => {
   try {
     const { token } = req.body;
+    console.log('Verifying token:', token);
 
-    // Find the token in the database
+    // Find the token in the global Token collection
     const tokenDoc = await Token.findOne({ token });
+    console.log('Token document found:', !!tokenDoc);
+
     if (!tokenDoc) {
+      console.log('Invalid token: not found in DB');
       return res.status(401).json({ message: 'Invalid token' });
     }
-
-    // Check if the token is revoked
     if (tokenDoc.revoked) {
+      console.log('Token has been revoked');
       return res.status(401).json({ message: 'Token has been revoked' });
     }
-
-    // Check if the token has expired
     if (tokenDoc.expiresAt < new Date()) {
+      console.log('Token has expired');
       return res.status(401).json({ message: 'Token has expired' });
     }
 
-    // Verify the JWT token
-    jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+    // Decode token to extract tenantId
+    jwt.verify(token, process.env.JWT_SECRET_KEY, async (err, decoded) => {
       if (err) {
+        console.log('JWT verification error:', err);
         return res.status(401).json({ message: 'Invalid token' });
       }
 
-      // Token is valid
+      console.log('Decoded JWT:', decoded);
+
+      const db = await getTenantDb(decoded.tenantId);
+      const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+      const invoice = await Invoice.findById(decoded.invoiceId);
+      console.log('Invoice found:', !!invoice);
+
+      if (!invoice) {
+        console.log('Invoice not found for decoded invoiceId');
+        return res.status(404).json({ message: 'Invoice not found' });
+      }
+
       res.status(200).json(decoded);
     });
   } catch (error) {
+    console.error('Error in verifyToken:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -621,17 +685,24 @@ export const revokeToken = async (req, res) => {
   try {
     const { token } = req.body;
 
-    // Find the token in the database
+    // Find the token in the global Token collection
     const tokenDoc = await Token.findOne({ token });
-    if (!tokenDoc) {
-      return res.status(404).json({ message: 'Token not found' });
-    }
+    if (!tokenDoc) return res.status(404).json({ message: 'Token not found' });
 
-    // Revoke the token
-    tokenDoc.revoked = true;
-    await tokenDoc.save();
+    jwt.verify(token, process.env.JWT_SECRET_KEY, async (err, decoded) => {
+      if (err) return res.status(401).json({ message: 'Invalid token' });
 
-    res.status(200).json({ message: 'Token revoked successfully' });
+      const db = await getTenantDb(decoded.tenantId);
+      const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+      const invoice = await Invoice.findById(decoded.invoiceId);
+      if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+      // Revoke the token
+      tokenDoc.revoked = true;
+      await tokenDoc.save();
+
+      res.status(200).json({ message: 'Token revoked successfully' });
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

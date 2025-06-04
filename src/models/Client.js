@@ -126,6 +126,4 @@ clientSchema.path('familyName').validate(function () {
   return this.givenName || this.lastName;
 }, 'Either firstName or lastName must be provided.');
 
-const Client = mongoose.model('Client', clientSchema);
-
-export default Client;
+export default clientSchema;

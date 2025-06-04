@@ -16,6 +16,4 @@ const materialsSchema = new Schema(
   { timestamps: true }
 );
 
-const Materials = mongoose.model('Materials', materialsSchema);
-
-export default Materials;
+export default materialsSchema;

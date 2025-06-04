@@ -1,7 +1,12 @@
-import MaterialsList from '../models/MaterialsList.js';
-import Materials from '../models/Materials.js';
+import { getTenantDb } from '../config/db.js';
+import materialsListSchema from '../models/MaterialsList.js';
+import materialsSchema from '../models/Materials.js';
 
 export const listOfMaterials = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   try {
     console.log('Fetching all materials from the database...');
     const materials = await Materials.find();
@@ -13,6 +18,10 @@ export const listOfMaterials = async (req, res) => {
 };
 
 export const addMaterialToList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { name, price } = req.body;
   try {
     const existingMaterial = await Materials.find({ name: name });
@@ -29,6 +38,10 @@ export const addMaterialToList = async (req, res) => {
 };
 
 export const deleteMaterialFromList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { id } = req.params;
   try {
     const deletedMaterial = await Materials.findByIdAndDelete(id);
@@ -43,6 +56,10 @@ export const deleteMaterialFromList = async (req, res) => {
 };
 
 export const updateMaterialInList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { id } = req.params;
   const { name, price } = req.body;
   console.log('Updating material with ID:', id, 'Name:', name, 'Price:', price);
@@ -62,6 +79,10 @@ export const updateMaterialInList = async (req, res) => {
 };
 
 export const createMaterialsList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { proposal, total, materials } = req.body;
   try {
     const newMaterialsList = new MaterialsList({
@@ -79,6 +100,10 @@ export const createMaterialsList = async (req, res) => {
 };
 
 export const getMaterialsListByProposalNumber = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { proposal } = req.params;
 
   if (!proposal || proposal === 'null') {
@@ -101,6 +126,10 @@ export const getMaterialsListByProposalNumber = async (req, res) => {
 };
 
 export const updateMaterialsList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { id } = req.params;
   console.log('Updating materials list for proposal:', id);
 
@@ -126,6 +155,10 @@ export const updateMaterialsList = async (req, res) => {
 };
 
 export const deleteMaterialsList = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { id } = req.params;
 
   if (!id || id === 'null') {
@@ -154,6 +187,10 @@ export const deleteMaterialsList = async (req, res) => {
 };
 
 export const getMaterialsListById = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+  const Materials = db.models.Materials || db.model('Materials', materialsSchema);
+
   const { id } = req.params;
 
   if (!id || id === 'null') {

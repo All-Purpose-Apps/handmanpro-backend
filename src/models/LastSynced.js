@@ -8,6 +8,4 @@ const lastSyncedSchema = new Schema({
   },
 });
 
-const LastSynced = mongoose.model('LastSynced', lastSyncedSchema);
-
-export default LastSynced;
+export default lastSyncedSchema;

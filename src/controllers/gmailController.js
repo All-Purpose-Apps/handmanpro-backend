@@ -1,9 +1,10 @@
 import { google } from 'googleapis';
 import axios from 'axios';
-import Client from '../models/Client.js';
-import Invoice from '../models/Invoice.js';
-import Notification from '../models/Notification.js';
-import Proposal from '../models/Proposal.js';
+import { getTenantDb } from '../config/db.js';
+import clientSchema from '../models/Client.js';
+import invoiceSchema from '../models/Invoice.js';
+import notificationSchema from '../models/Notification.js';
+import proposalSchema from '../models/Proposal.js';
 
 export const listGmailMessages = async (req, res) => {
   const oauth2Client = req.oauth2Client;
@@ -35,6 +36,11 @@ export const sendEmail = async (req, res) => {
     return res.status(401).json({ msg: 'Unauthorized' });
   }
 
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
@@ -86,6 +92,8 @@ export const sendEmail = async (req, res) => {
     console.error('Error sending email:', error);
     res.status(500).json({ msg: 'Failed to send email', error: error.message });
   } finally {
+    const db = await getTenantDb(req.tenantId);
+    const Client = db.models.Client || db.model('Client', clientSchema);
     try {
       const updateTimestamp = { updatedAt: new Date() };
 
@@ -117,6 +125,12 @@ export const sendProposal = async (req, res) => {
   }
 
   try {
+    const db = await getTenantDb(req.tenantId);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     // Fetch PDF from URL and encode it in base64
@@ -168,6 +182,9 @@ export const sendProposal = async (req, res) => {
     res.status(500).json({ msg: 'Failed to send email', error: error.message });
   } finally {
     try {
+      const db = await getTenantDb(req.tenantId);
+      const Client = db.models.Client || db.model('Client', clientSchema);
+      const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
       const updateTimestamp = { updatedAt: new Date() };
 
       // Update client's statusHistory and updatedAt
@@ -176,8 +193,7 @@ export const sendProposal = async (req, res) => {
         ...updateTimestamp,
       });
 
-      // Update proposal status to "sent" and updatedAt
-      console.log(proposal._id);
+      // Update proposal status to "sent to client" and updatedAt
       await Proposal.findByIdAndUpdate(proposal._id, {
         status: 'sent to client',
         ...updateTimestamp,

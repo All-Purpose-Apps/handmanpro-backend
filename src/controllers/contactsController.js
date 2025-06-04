@@ -1,9 +1,10 @@
 import { google } from 'googleapis';
 import { Storage } from '@google-cloud/storage';
-import Client from '../models/Client.js';
-import Invoice from '../models/Invoice.js';
-import Proposal from '../models/Proposal.js';
-import Notification from '../models/Notification.js';
+import { getTenantDb } from '../config/db.js';
+import clientSchema from '../models/Client.js';
+import invoiceSchema from '../models/Invoice.js';
+import proposalSchema from '../models/Proposal.js';
+import notificationSchema from '../models/Notification.js';
 
 const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
 const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -91,6 +92,12 @@ export const createGoogleContact = async (req, res) => {
 };
 
 export const deleteContact = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
   const oauth2Client = req.oauth2Client;
 
   if (!oauth2Client) {

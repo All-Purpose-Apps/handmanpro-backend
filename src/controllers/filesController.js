@@ -1,8 +1,9 @@
 import { Storage } from '@google-cloud/storage'; // Function to delete a file from the bucket
-import Invoice from '../models/Invoice.js';
-import Client from '../models/Client.js';
-import Notification from '../models/Notification.js';
-import Proposal from '../models/Proposal.js';
+import { getTenantDb } from '../config/db.js';
+import invoiceSchema from '../models/Invoice.js';
+import clientSchema from '../models/Client.js';
+import notificationSchema from '../models/Notification.js';
+import proposalSchema from '../models/Proposal.js';
 
 // Load GCS credentials from environment variable (same as proposalController.js)
 const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
@@ -62,6 +63,12 @@ export const getFilesFromBucket = async (req, res) => {
 };
 
 export const deleteFileFromBucket = async (req, res) => {
+  const db = await getTenantDb(req.tenantId);
+  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const Client = db.models.Client || db.model('Client', clientSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
   const { filename } = req.query;
   console.log('Deleting file:', filename);
   try {

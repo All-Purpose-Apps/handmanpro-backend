@@ -30,8 +30,16 @@ mongoose.connect(process.env.MONGO_URI, {
 app.use(express.json({ limit: '50mb' }));
 app.use(
   cors({
-    origin: process.env.NODE_ENV === 'production' ? 'https://handmanpro.netlify.app' : 'http://localhost:5173',
-    credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+    origin: (origin, callback) => {
+      const allowedOrigins = ['http://localhost:5173', 'http://192.168.1.213:5173', 'https://handmanpro.netlify.app'];
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
   })
 );
 
@@ -77,4 +85,4 @@ app.use('/api/files', filesRoutes);
 // expressListRoutes(app);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));

@@ -114,6 +114,10 @@ const clientSchema = new Schema({
     type: String,
     default: 'google',
   },
+  newClient: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 // Custom validation to require either email or phone, but allow empty strings

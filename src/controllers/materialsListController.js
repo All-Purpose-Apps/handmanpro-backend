@@ -1,6 +1,7 @@
 import { getTenantDb } from '../config/db.js';
 import materialsListSchema from '../models/MaterialsList.js';
 import materialsSchema from '../models/Materials.js';
+import mongoose from 'mongoose';
 
 export const listOfMaterials = async (req, res) => {
   const db = await getTenantDb(req.tenantId);

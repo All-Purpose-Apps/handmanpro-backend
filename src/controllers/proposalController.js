@@ -24,7 +24,7 @@ const tokenSchema = new mongoose.Schema({
 export const createProposal = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema).populate('client');
     const Client = db.models.Client || db.model('Client', clientSchema);
     const proposal = new Proposal(req.body);
     await proposal.save();
@@ -43,8 +43,8 @@ export const createProposal = async (req, res) => {
       }
     }
 
-    const proposals = await Proposal.find({}).populate('client');
-    res.status(201).send(proposals);
+    // const proposals = await Proposal.find({}).populate('client');
+    res.status(201).send(proposal);
   } catch (error) {
     console.log('Error creating proposal:', error);
     res.status(400).send(error);
@@ -545,7 +545,7 @@ export const uploadProposalWithSignature = async (req, res) => {
     console.log('Starting uploadProposalWithSignature...');
     // Extract token from Authorization header
     const token = req.body.token;
-    console.log('Token from header:', token);
+
     const tokenDoc = await Token.findOne({ token: token });
     if (!tokenDoc) {
       console.log('Token not found in DB');

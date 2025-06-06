@@ -205,3 +205,67 @@ export const sendProposal = async (req, res) => {
     }
   }
 };
+
+export const sendReviewRequestEmail = async (req, res) => {
+  const oauth2Client = req.oauth2Client;
+  const { to, subject, clientId } = req.body;
+
+  if (!oauth2Client) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+
+  try {
+    const db = await getTenantDb(req.tenantId);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Construct email body with review link
+    const body = `
+    <p>Thank you for choosing our service!</p>
+    <p>We would appreciate it if you could take a moment to review us on social media:</p>
+
+    <p>Your feedback helps us improve and grow.</p>
+    <p>Thank you!</p>`;
+
+    // Construct email without attachment
+    const email = [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0', 'Content-Type: text/html; charset="UTF-8"', '', body].join('\n');
+
+    const encodedEmail = Buffer.from(email).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+
+    // Send the email
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedEmail,
+      },
+    });
+
+    const notification = new Notification({
+      title: 'Review Request Sent',
+      message: `Review request sent to ${to}`,
+      type: 'email',
+    });
+    await notification.save();
+    res.status(200).json({ msg: 'Review request email sent successfully!' });
+  } catch (error) {
+    console.error('Error sending review request email:', error);
+    res.status(500).json({ msg: 'Failed to send review request email', error: error.message });
+  } finally {
+    try {
+      const db = await getTenantDb(req.tenantId);
+      const Client = db.models.Client || db.model('Client', clientSchema);
+      const updateTimestamp = { updatedAt: new Date() };
+
+      // Update client's statusHistory and updatedAt
+      await Client.findByIdAndUpdate(clientId, {
+        $push: { statusHistory: { status: 'review requested', date: updateTimestamp.updatedAt } },
+        ...updateTimestamp,
+      });
+
+      console.log('Client statusHistory, and updatedAt fields updated successfully.');
+    } catch (updateError) {
+      console.error('Error updating client or invoice status and updatedAt:', updateError);
+    }
+  }
+};

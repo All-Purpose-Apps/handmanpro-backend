@@ -203,6 +203,7 @@ export const deleteInvoice = async (req, res) => {
 
 export const createInvoicePdf = async (req, res) => {
   try {
+    const db = await getTenantDb(req.tenantId);
     // Parse credentials from environment variable
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -336,7 +337,6 @@ export const createInvoicePdf = async (req, res) => {
         form.getCheckBox('Online').check();
         break;
       default:
-        console.log('Payment method not recognized');
     }
 
     const totalField = form.getTextField('Total');
@@ -351,9 +351,7 @@ export const createInvoicePdf = async (req, res) => {
 
     // Upload the generated PDF to Google Cloud Storage
     const bucketName = 'invoicesproposals';
-    const objectName = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
-
-    console.log('Uploading file with object name:', objectName);
+    const objectName = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
 
     // Convert pdfBytes (Uint8Array) to a readable stream
     const bufferStream = new PassThrough();
@@ -369,8 +367,6 @@ export const createInvoicePdf = async (req, res) => {
       },
       predefinedAcl: 'publicRead', // Makes the file publicly accessible
     });
-
-    console.log('File uploaded successfully to:', objectName);
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
@@ -467,10 +463,6 @@ export const uploadPdfWithSignature = async (req, res) => {
   try {
     const { pdfUrl, signatureImage, invoiceNumber, invoiceId } = req.body;
 
-    console.log('pdfUrl:', pdfUrl);
-    console.log('invoiceNumber:', invoiceNumber);
-    console.log('invoiceId:', invoiceId);
-
     // Fetch the invoice and populate the client field
     const invoice = await Invoice.findById(invoiceId).populate('client');
     if (!invoice) {
@@ -496,11 +488,9 @@ export const uploadPdfWithSignature = async (req, res) => {
 
     // Load and modify the PDF
     const pdfDoc = await PDFDocument.load(pdfBytes);
-    console.log('PDF loaded successfully');
 
     // Embed the signature image
     const signatureImageEmbed = await pdfDoc.embedPng(signatureBuffer);
-    console.log('Signature image embedded');
 
     // Determine dimensions for the signature
     const signatureDims = signatureImageEmbed.scale(0.5);
@@ -516,11 +506,9 @@ export const uploadPdfWithSignature = async (req, res) => {
       width: signatureDims.width / 5,
       height: signatureDims.height / 5,
     });
-    console.log('Signature drawn on PDF');
 
     // Save the modified PDF
     const updatedPdfBytes = await pdfDoc.save();
-    console.log('PDF saved with signature');
 
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -532,8 +520,6 @@ export const uploadPdfWithSignature = async (req, res) => {
     const bucketName = 'invoicesproposals';
     const objectName = `invoices/invoice_${invoiceNumber}_${invoice.client.name}_signed.pdf`;
 
-    console.log('Uploading file with object name:', objectName);
-
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(objectName);
 
@@ -541,8 +527,6 @@ export const uploadPdfWithSignature = async (req, res) => {
       metadata: { contentType: 'application/pdf' },
       predefinedAcl: 'publicRead',
     });
-
-    console.log('File uploaded successfully to:', objectName);
 
     // Update the invoice with the signed PDF URL and status
     invoice.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
@@ -635,41 +619,31 @@ export const createToken = async (req, res) => {
 export const verifyToken = async (req, res) => {
   try {
     const { token } = req.body;
-    console.log('Verifying token:', token);
 
     // Find the token in the global Token collection
     const tokenDoc = await Token.findOne({ token });
-    console.log('Token document found:', !!tokenDoc);
 
     if (!tokenDoc) {
-      console.log('Invalid token: not found in DB');
       return res.status(401).json({ message: 'Invalid token' });
     }
     if (tokenDoc.revoked) {
-      console.log('Token has been revoked');
       return res.status(401).json({ message: 'Token has been revoked' });
     }
     if (tokenDoc.expiresAt < new Date()) {
-      console.log('Token has expired');
       return res.status(401).json({ message: 'Token has expired' });
     }
 
     // Decode token to extract tenantId
     jwt.verify(token, process.env.JWT_SECRET_KEY, async (err, decoded) => {
       if (err) {
-        console.log('JWT verification error:', err);
         return res.status(401).json({ message: 'Invalid token' });
       }
-
-      console.log('Decoded JWT:', decoded);
 
       const db = await getTenantDb(decoded.tenantId);
       const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
       const invoice = await Invoice.findById(decoded.invoiceId);
-      console.log('Invoice found:', !!invoice);
 
       if (!invoice) {
-        console.log('Invoice not found for decoded invoiceId');
         return res.status(404).json({ message: 'Invoice not found' });
       }
 

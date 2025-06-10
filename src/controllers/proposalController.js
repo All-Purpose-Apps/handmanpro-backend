@@ -46,7 +46,6 @@ export const createProposal = async (req, res) => {
     // const proposals = await Proposal.find({}).populate('client');
     res.status(201).send(proposal);
   } catch (error) {
-    console.log('Error creating proposal:', error);
     res.status(400).send(error);
   }
 };
@@ -406,7 +405,6 @@ export const createProposalToken = async (req, res) => {
       tenantId, // Include tenantId in the payload
     };
 
-    console.log('Creating token for proposal:', tokenData);
     const tokenString = jwt.sign(tokenData, process.env.JWT_SECRET_KEY, { expiresIn: '2d' });
     const tokenDoc = new Token({
       token: tokenString,
@@ -427,37 +425,29 @@ export const createProposalToken = async (req, res) => {
 export const verifyProposalToken = async (req, res) => {
   try {
     const { token } = req.body;
-    console.log('Verifying proposal token:', token);
 
     // Use the global Token model, already imported at the top
     const tokenDoc = await Token.findOne({ token });
-    console.log('Token document found:', !!tokenDoc);
 
     if (!tokenDoc) {
-      console.log('Token not found in database');
       return res.status(401).json({ message: 'Invalid token' });
     }
     if (tokenDoc.revoked) {
-      console.log('Token has been revoked');
       return res.status(401).json({ message: 'Token has been revoked' });
     }
     if (tokenDoc.expiresAt < new Date()) {
-      console.log('Token has expired');
       return res.status(401).json({ message: 'Token has expired' });
     }
     // After verifying the token, derive tenantId and get tenant DB context
     const decoded = jwt.decode(token);
     const tenantId = decoded?.tenantId;
-    console.log('Decoded tenantId:', tenantId);
 
     const db = await getTenantDb(tenantId);
     // Optionally use Proposal model if needed after verification
     jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decodedPayload) => {
       if (err) {
-        console.log('JWT verification failed:', err.message);
         return res.status(401).json({ message: 'Invalid token' });
       }
-      console.log('Token verified successfully:', decodedPayload);
       res.status(200).json(decodedPayload);
     });
   } catch (error) {
@@ -489,9 +479,6 @@ export const revokeProposalToken = async (req, res) => {
 
 // Download a signed proposal PDF from a URL and serve it to the client
 export const downloadProposalPdf = async (req, res) => {
-  console.log('req.query:', req.query);
-  console.log('Authorization:', req.headers.authorization);
-
   try {
     // Extract tenantId from the token before loading the proposal model
     // Use the global Token model, already imported at the top
@@ -509,7 +496,6 @@ export const downloadProposalPdf = async (req, res) => {
     const tenantId = decoded.tenantId;
     const db = await getTenantDb(tenantId);
     const url = Object.keys(req.query);
-    console.log('URL from query:', url);
     if (!url) {
       return res.status(400).send('Missing PDF URL');
     }
@@ -542,23 +528,19 @@ export const downloadProposalPdf = async (req, res) => {
 // Embed a signature into a proposal PDF and re-upload it to Google Cloud Storage
 export const uploadProposalWithSignature = async (req, res) => {
   try {
-    console.log('Starting uploadProposalWithSignature...');
     // Extract token from Authorization header
     const token = req.body.token;
 
     const tokenDoc = await Token.findOne({ token: token });
     if (!tokenDoc) {
-      console.log('Token not found in DB');
       return res.status(404).json({ message: 'Token not found' });
     }
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     } catch (err) {
-      console.log('JWT verification failed:', err.message);
       return res.status(401).json({ message: 'Invalid token' });
     }
-    console.log('Decoded token:', decoded);
     const tenantId = decoded.tenantId;
     const db = await getTenantDb(tenantId);
     const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
@@ -566,16 +548,12 @@ export const uploadProposalWithSignature = async (req, res) => {
     const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const { pdfUrl, signatureImage, proposalNumber, proposalId } = req.body;
 
-    console.log('Request body:', req.body);
-
     const proposal = await Proposal.findById(proposalId).populate('client');
     if (!proposal) {
-      console.log('Proposal not found:', proposalId);
       return res.status(404).json({ message: 'Proposal not found' });
     }
 
     if (!pdfUrl || !signatureImage) {
-      console.log('Missing required fields: pdfUrl or signatureImage');
       return res.status(400).json({ message: 'Missing required fields' });
     }
     const now = new Date();
@@ -583,16 +561,13 @@ export const uploadProposalWithSignature = async (req, res) => {
     proposal.dateAccepted = formattedDate;
     const signatureData = signatureImage.replace(/^data:image\/\w+;base64,/, '');
     const signatureBuffer = Buffer.from(signatureData, 'base64');
-    console.log('Signature buffer created');
 
     const response = await fetch(pdfUrl);
     if (!response.ok) {
-      console.log('Failed to fetch PDF:', response.statusText);
       throw new Error(`Failed to fetch PDF: ${response.statusText}`);
     }
     const pdfBytes = await response.arrayBuffer();
     const pdfDoc = await PDFDocument.load(pdfBytes);
-    console.log('PDF loaded from URL');
 
     const signatureImageEmbed = await pdfDoc.embedPng(signatureBuffer);
     const signatureDims = signatureImageEmbed.scale(0.5);
@@ -604,7 +579,6 @@ export const uploadProposalWithSignature = async (req, res) => {
       width: signatureDims.width / 5,
       height: signatureDims.height / 5,
     });
-    console.log('Signature image embedded');
 
     firstPage.drawText(proposal.dateAccepted, {
       x: 380,
@@ -613,10 +587,8 @@ export const uploadProposalWithSignature = async (req, res) => {
       color: rgb(0, 0, 0),
       font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
     });
-    console.log('Date accepted drawn on PDF');
 
     const updatedPdfBytes = await pdfDoc.save();
-    console.log('PDF saved with signature');
 
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -632,12 +604,10 @@ export const uploadProposalWithSignature = async (req, res) => {
       metadata: { contentType: 'application/pdf' },
       predefinedAcl: 'publicRead',
     });
-    console.log('Signed PDF uploaded to GCS:', objectName);
 
     proposal.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
     proposal.status = 'accepted';
     await proposal.save();
-    console.log('Proposal updated with signedPdfUrl and status');
 
     if (proposal.token) {
       // Use the global Token model, already imported at the top
@@ -645,7 +615,6 @@ export const uploadProposalWithSignature = async (req, res) => {
       if (tokenDoc) {
         tokenDoc.revoked = true;
         await tokenDoc.save();
-        console.log('Token revoked');
       }
     }
 
@@ -657,7 +626,6 @@ export const uploadProposalWithSignature = async (req, res) => {
         date: new Date(),
       });
       await client.save();
-      console.log('Client status history updated');
     }
 
     const notification = new Notification({
@@ -668,10 +636,8 @@ export const uploadProposalWithSignature = async (req, res) => {
     });
 
     await notification.save();
-    console.log('Notification saved');
 
     res.json({ url: proposal.signedPdfUrl, signedProposal: proposal });
-    console.log('Response sent with signed PDF URL');
   } catch (error) {
     console.error('Error embedding signature into proposal PDF:', error);
     res.status(500).json({ message: error.message });

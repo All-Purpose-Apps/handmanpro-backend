@@ -9,7 +9,6 @@ export const listOfMaterials = async (req, res) => {
   const Materials = db.models.Materials || db.model('Materials', materialsSchema);
 
   try {
-    console.log('Fetching all materials from the database...');
     const materials = await Materials.find();
     res.status(200).json(materials);
   } catch (error) {

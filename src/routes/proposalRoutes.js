@@ -12,6 +12,7 @@ import {
   revokeProposalToken,
   downloadProposalPdf,
   uploadProposalWithSignature,
+  internalUploadProposalWithSignature,
 } from '../controllers/proposalController.js';
 
 router.get('/', getAllProposals);
@@ -33,5 +34,7 @@ router.post('/revoke-token', revokeProposalToken);
 
 router.get('/download-pdf/:url', downloadProposalPdf);
 router.post('/upload-pdf-with-signature', uploadProposalWithSignature);
+
+router.post('/internal-upload-pdf-with-signature/:id', internalUploadProposalWithSignature);
 
 export default router;

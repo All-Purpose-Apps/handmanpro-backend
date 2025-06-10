@@ -677,3 +677,102 @@ export const uploadProposalWithSignature = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Internal upload with signature for admin or internal use
+export const internalUploadProposalWithSignature = async (req, res) => {
+  try {
+    const proposalId = req.params.id;
+    const { signature } = req.body;
+
+    if (!proposalId) {
+      return res.status(400).json({ message: 'Missing proposal ID' });
+    }
+
+    const db = await getTenantDb(req.tenantId);
+    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
+    const proposal = await Proposal.findById(proposalId).populate('client');
+    if (!proposal) {
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+
+    const now = new Date();
+    const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+    proposal.dateAccepted = formattedDate;
+
+    // Fetch the signature from proposal.signature (base64 string)
+    const signatureData = signature?.replace(/^data:image\/\w+;base64,/, '');
+    const signatureBuffer = Buffer.from(signatureData, 'base64');
+
+    // Fetch the PDF from proposal.pdfUrl
+
+    const response = await fetch(proposal.fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch original PDF: ${response.statusText}`);
+    }
+
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const signatureEmbed = await pdfDoc.embedPng(signatureBuffer);
+    const signatureDims = signatureEmbed.scale(0.5);
+    const firstPage = pdfDoc.getPages()[0];
+
+    firstPage.drawImage(signatureEmbed, {
+      x: 350,
+      y: 220,
+      width: signatureDims.width / 5,
+      height: signatureDims.height / 5,
+    });
+
+    firstPage.drawText(formattedDate, {
+      x: 380,
+      y: 165,
+      size: 14,
+      color: rgb(0, 0, 0),
+      font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+    });
+
+    const updatedPdfBytes = await pdfDoc.save();
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+    const storage = new Storage({ credentials: gcsCredentials });
+    const bucketName = 'invoicesproposals';
+    const objectName = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}_signed.pdf`;
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(Buffer.from(updatedPdfBytes), {
+      metadata: { contentType: 'application/pdf' },
+      predefinedAcl: 'publicRead',
+    });
+
+    proposal.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${Date.now()}`;
+    proposal.status = 'accepted';
+    await proposal.save();
+
+    const client = await Client.findById(proposal.client);
+    if (client) {
+      client.statusHistory.push({
+        status: 'proposal signed',
+        date: new Date(),
+      });
+      await client.save();
+    }
+
+    const notification = new Notification({
+      title: 'Proposal Signed Internally',
+      message: `Proposal ${proposal.proposalNumber} has been signed internally`,
+      type: 'proposals',
+      id: proposal._id,
+    });
+
+    await notification.save();
+
+    res.json({ url: proposal.signedPdfUrl, signedProposal: proposal });
+  } catch (error) {
+    console.error('Error in internalUploadProposalWithSignature:', error);
+    res.status(500).json({ message: error.message });
+  }
+};

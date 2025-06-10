@@ -30,7 +30,7 @@ export const authenticateGoogleAPI = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Google API Auth Error:', error.message);
+    console.error(`at ${new Date().toLocaleString()} Google API Auth Error: ${error.message}`);
     res.status(401).json({ msg: 'Unauthorized: ' + error.message });
   }
 };

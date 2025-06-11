@@ -65,4 +65,21 @@ const proposalSchema = new Schema({
   },
 });
 
+proposalSchema.pre('save', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+proposalSchema.pre('findOneAndUpdate', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+proposalSchema.pre('updateOne', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+proposalSchema.pre('updateMany', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
 export default proposalSchema;

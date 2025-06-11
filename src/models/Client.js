@@ -132,4 +132,13 @@ clientSchema.path('familyName').validate(function () {
   return this.givenName || this.lastName;
 }, 'Either firstName or lastName must be provided.');
 
+clientSchema.pre('save', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+clientSchema.pre('findOneAndUpdate', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
 export default clientSchema;

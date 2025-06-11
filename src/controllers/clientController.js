@@ -1,18 +1,14 @@
 import { google } from 'googleapis';
 import { getTenantDb } from '../config/db.js';
-import clientSchema from '../models/Client.js';
-import invoiceSchema from '../models/Invoice.js';
-import proposalSchema from '../models/Proposal.js';
+import { getModels } from '../utils/modelUtils.js';
 const people = google.people('v1');
 
 const getClients = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client } = getModels(db);
 
   try {
-    const clients = await Client.find().populate('invoices');
+    const clients = await Client.find().lean();
     res.json(clients);
   } catch (error) {
     res.status(500).send('Server Error');
@@ -21,14 +17,12 @@ const getClients = async (req, res) => {
 
 const createClient = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client } = getModels(db);
 
   try {
     const { phone } = req.body;
-    const existingClient = await Client.find({ phone });
-    if (existingClient.length > 0) {
+    const existingClient = await Client.findOne({ phone });
+    if (existingClient) {
       return res.status(400).json({ msg: 'Client already exists' });
     }
 
@@ -36,9 +30,7 @@ const createClient = async (req, res) => {
 
     await client.save();
 
-    const clients = await Client.find().populate('invoices').populate('proposals');
-
-    res.json(clients);
+    res.json(client);
   } catch (error) {
     console.log(error);
     res.status(500).send(error);
@@ -47,9 +39,7 @@ const createClient = async (req, res) => {
 
 const updateClient = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client } = getModels(db);
 
   const { id } = req.params;
   const oauth2Client = req.oauth2Client;
@@ -108,14 +98,12 @@ const updateClient = async (req, res) => {
 
 const getClient = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client } = getModels(db);
 
   const { id } = req.params;
 
   try {
-    let client = await Client.findById(id).populate('invoices').populate('proposals');
+    let client = await Client.findById(id).populate('invoices').populate('proposals').lean();
     if (!client) {
       return res.status(404).json({ msg: 'Client not found' });
     }
@@ -127,9 +115,7 @@ const getClient = async (req, res) => {
 
 const deleteClient = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client, Invoice } = getModels(db);
 
   const { id } = req.params;
 
@@ -148,12 +134,10 @@ const deleteClient = async (req, res) => {
 
 const syncClients = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client, Invoice, Proposal } = getModels(db);
 
   try {
-    const mongoClients = await Client.find();
+    const mongoClients = await Client.find().select('resourceName invoices proposals').lean();
     const googleClients = req.body;
 
     const mongoClientIds = mongoClients.map((client) => client.resourceName);
@@ -176,7 +160,7 @@ const syncClients = async (req, res) => {
     const bulkOps = googleClients.map((client) => {
       const updateData = {};
       for (const key in client) {
-        if (client[key] !== undefined && client[key] !== null && client[key] !== '') {
+        if (client[key]) {
           updateData[key] = client[key];
         }
       }
@@ -196,7 +180,7 @@ const syncClients = async (req, res) => {
       await Client.bulkWrite(bulkOps);
     }
 
-    const updatedClients = await Client.find();
+    const updatedClients = await Client.find().lean();
     res.json(updatedClients);
   } catch (error) {
     console.error('Error synchronizing clients:', error);
@@ -206,9 +190,7 @@ const syncClients = async (req, res) => {
 
 const clearClientStatusHistory = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
-  const Client = db.models.Client || db.model('Client', clientSchema);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+  const { Client } = getModels(db);
 
   console.log('Clearing client status history');
   const { clientId } = req.body;
@@ -216,7 +198,7 @@ const clearClientStatusHistory = async (req, res) => {
     return res.status(400).json({ msg: 'Client ID is required' });
   }
   try {
-    const client = await Client.findById(clientId);
+    const client = await Client.findById(clientId).select('statusHistory').exec();
     if (!client) {
       return res.status(404).json({ msg: 'Client not found' });
     }

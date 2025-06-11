@@ -98,4 +98,24 @@ const invoiceSchema = new Schema({
   },
 });
 
+// Automatically update updatedAt when document is changed
+invoiceSchema.pre('save', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+invoiceSchema.pre('findOneAndUpdate', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
+
+invoiceSchema.pre('updateOne', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
+invoiceSchema.pre('updateMany', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
+
 export default invoiceSchema;

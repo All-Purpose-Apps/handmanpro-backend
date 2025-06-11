@@ -107,7 +107,6 @@ export const updateInvoice = async (req, res) => {
         status: 'invoice signed and paid',
         date: new Date(),
       });
-      invoiceData.updateAt = new Date();
       await client.save();
       const notification = new Notification({
         title: 'Invoice Signed and Paid',

@@ -35,7 +35,7 @@ const proposalSchema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ['draft', 'sent to client', 'accepted', 'rejected', 'converted to invoice'],
+    enum: ['draft', 'sent to client', 'accepted', 'rejected', 'converted to invoice', 'proposal pdf created'],
     default: 'draft',
   },
   dateAccepted: {

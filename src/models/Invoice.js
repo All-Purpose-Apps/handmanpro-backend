@@ -68,7 +68,7 @@ const invoiceSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'sent', 'paid', 'canceled', 'signed and paid', 'signed', 'deleted'],
+    enum: ['created', 'sent', 'paid', 'canceled', 'signed and paid', 'signed', 'deleted', 'invoice pdf created'],
     default: 'created',
   },
   createdAt: {

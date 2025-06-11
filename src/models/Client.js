@@ -34,6 +34,8 @@ const StatusUpdateSchema = new mongoose.Schema({
       'task assigned',
       'work in progress',
       'review requested',
+      'proposal pdf created',
+      'invoice pdf created',
     ],
     required: true,
   },

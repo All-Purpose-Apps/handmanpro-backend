@@ -148,19 +148,24 @@ export const updateInvoice = async (req, res) => {
 
 // Delete an invoice by ID
 export const deleteInvoice = async (req, res) => {
-  const db = await getTenantDb(req.tenantId);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Client = db.models.Client || db.model('Client', clientSchema);
+  console.log('deleteInvoice called with params:', req.params);
   let invoice;
   try {
+    const db = await getTenantDb(req.tenantId);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+
     // Find and delete the invoice
     invoice = await Invoice.findById(req.params.id).populate('client');
+    console.log('Fetched invoice:', invoice);
     if (!invoice) {
+      console.log('Invoice not found');
       return res.status(404).json({ message: 'Invoice not found' });
     }
 
     // Remove the invoice from the client's invoices array and update status
     const client = await Client.findById(invoice.client);
+    console.log('Fetched client:', client);
     if (client) {
       client.invoices.pull(invoice._id);
       client.statusHistory.push({
@@ -168,15 +173,19 @@ export const deleteInvoice = async (req, res) => {
         date: new Date(),
       });
       await client.save();
+      console.log('Client updated after invoice deletion');
     }
 
     // Delete the invoice document
     await Invoice.findByIdAndDelete(req.params.id);
+    console.log('Invoice document deleted from DB');
 
     // Retrieve all invoices and populate the client field
     const invoices = await Invoice.find().populate('client');
     res.status(200).json(invoices);
+    console.log('Response sent with updated invoices');
   } catch (error) {
+    console.error('Error in deleteInvoice:', error);
     res.status(500).json({ message: error.message });
   }
 
@@ -186,15 +195,17 @@ export const deleteInvoice = async (req, res) => {
 
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
-    if (invoice.invoiceNumber && invoice.client?.name) {
-      const filePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
+    if (invoice && invoice.invoiceNumber && invoice.client?.name) {
+      const filePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
       const file = storage.bucket(bucketName).file(filePath);
       await file.delete();
+      console.log('Deleted invoice PDF from GCS:', filePath);
     }
-    if (invoice.signedPdfUrl) {
-      const signedFilePath = `invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
+    if (invoice && invoice.signedPdfUrl) {
+      const signedFilePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
       const signedFile = storage.bucket(bucketName).file(signedFilePath);
       await signedFile.delete();
+      console.log('Deleted signed invoice PDF from GCS:', signedFilePath);
     }
   } catch (err) {
     console.error('Error deleting invoice PDF from GCS:', err);
@@ -518,7 +529,7 @@ export const uploadPdfWithSignature = async (req, res) => {
       credentials: gcsCredentials,
     });
     const bucketName = 'invoicesproposals';
-    const objectName = `invoices/invoice_${invoiceNumber}_${invoice.client.name}_signed.pdf`;
+    const objectName = `${tenantId}/invoices/invoice_${invoiceNumber}_${invoice.client.name}_signed.pdf`;
 
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(objectName);

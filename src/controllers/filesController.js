@@ -62,7 +62,7 @@ export const getFilesFromBucket = async (req, res) => {
     for (const [folder, contents] of folderMap.entries()) {
       organized[folder] = contents;
     }
-    res.json({ folders, organized });
+    res.json({ folders, organized, allFiles: fileList });
   } catch (error) {
     console.error('Error listing files from bucket:', error.message);
     res.status(500).json({ error: 'Failed to list files from bucket' });
@@ -78,27 +78,50 @@ export const deleteFileFromBucket = async (req, res) => {
     const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const { filename } = req.query;
     const bucketName = `invoicesproposals`;
-    const filePath = `${req.tenantId}/${filename}`;
-    const file = storage.bucket(bucketName).file(filePath);
-    const fileUrl = `https://storage.googleapis.com/${bucketName}/${filePath}`;
+    const prefix = `${req.tenantId}/`;
 
-    await file.delete();
+    const sanitizedFilename = filename.replace(/\.pdf$/, '');
+
+    const [files] = await storage.bucket(bucketName).getFiles({
+      prefix: `${prefix}`,
+    });
+
+    let matchingFiles;
+    if (sanitizedFilename.includes('_signed')) {
+      matchingFiles = files.filter((f) => f.name === `${sanitizedFilename}.pdf`);
+    } else {
+      matchingFiles = files.filter((f) => f.name === `${sanitizedFilename}.pdf` || f.name === `${sanitizedFilename}_signed.pdf`);
+    }
+
+    await Promise.all(matchingFiles.map((f) => f.delete()));
+
+    const fileUrlRegex = new RegExp(`${sanitizedFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 
     const invoices = await Invoice.find({
-      $or: [{ fileUrl: { $regex: fileUrl } }, { signedPdfUrl: { $regex: fileUrl } }],
+      $or: [{ fileUrl: { $regex: fileUrlRegex } }, { signedPdfUrl: { $regex: fileUrlRegex } }],
     });
     const proposals = await Proposal.find({
-      $or: [{ fileUrl: { $regex: fileUrl } }, { signedPdfUrl: { $regex: fileUrl } }],
+      $or: [{ fileUrl: { $regex: fileUrlRegex } }, { signedPdfUrl: { $regex: fileUrlRegex } }],
     });
 
     for (const invoice of invoices) {
-      invoice.fileUrl = '';
-      await invoice.save();
+      let updated = false;
+      if (fileUrlRegex.test(invoice.fileUrl)) {
+        invoice.fileUrl = '';
+        invoice.status = 'created';
+        updated = true;
+      }
+      if (fileUrlRegex.test(invoice.signedPdfUrl)) {
+        invoice.signedPdfUrl = '';
+        invoice.status = 'sent';
+        updated = true;
+      }
+      if (updated) await invoice.save();
 
       const client = await Client.findById(invoice.client);
       if (client) {
         client.statusHistory.push({
-          status: 'invoice created',
+          status: `invoice ${invoice.status}`,
           date: new Date(),
         });
         await client.save();
@@ -113,13 +136,23 @@ export const deleteFileFromBucket = async (req, res) => {
     }
 
     for (const proposal of proposals) {
-      proposal.fileUrl = '';
-      await proposal.save();
+      let updated = false;
+      if (fileUrlRegex.test(proposal.fileUrl)) {
+        proposal.fileUrl = '';
+        proposal.status = 'created';
+        updated = true;
+      }
+      if (fileUrlRegex.test(proposal.signedPdfUrl)) {
+        proposal.signedPdfUrl = '';
+        proposal.status = 'sent';
+        updated = true;
+      }
+      if (updated) await proposal.save();
 
       const client = await Client.findById(proposal.client);
       if (client) {
         client.statusHistory.push({
-          status: 'proposal created',
+          status: `proposal ${proposal.status}`,
           date: new Date(),
         });
         await client.save();
@@ -139,10 +172,53 @@ export const deleteFileFromBucket = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete file from bucket' });
   }
 };
+export const showDeletedFilesInBucket = async (req, res) => {
+  try {
+    const db = await getTenantDb(req.tenantId);
+    const bucketName = `invoicesproposals`;
+    const prefix = `${req.tenantId}/`;
+
+    const [files] = await storage.bucket(bucketName).getFiles({
+      prefix: `${prefix}`,
+      autoPaginate: false,
+      versions: true, // Fetch all versions of the files
+    });
+
+    const deletedFiles = files.filter((file) => file.metadata.deleted);
+
+    if (deletedFiles.length === 0) {
+      return res.status(404).json({ message: 'No deleted files found' });
+    }
+
+    const fileList = await Promise.all(
+      deletedFiles.map(async (file) => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 15 * 60 * 1000,
+        });
+
+        return {
+          name: file.name,
+          size: file.metadata.size,
+          contentType: file.metadata.contentType,
+          updated: file.metadata.updated,
+          url,
+          isFolder: file.name.endsWith('/'),
+        };
+      })
+    );
+
+    res.json(fileList);
+  } catch (error) {
+    console.error('Error listing deleted files from bucket:', error.message);
+    res.status(500).json({ error: 'Failed to list deleted files from bucket' });
+  }
+};
+
 // function to rename a file in the bucket
 export const renameFileInBucket = async (req, res) => {
   console.log(req.body);
-  const { oldFileName, newFileName } = req.body;
+  const { oldbaseName, newFileName } = req.body;
   console.log('Renaming file:', oldFileName, 'to', newFileName);
 
   try {

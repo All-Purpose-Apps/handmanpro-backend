@@ -26,13 +26,15 @@ export const createProposal = async (req, res) => {
     const db = await getTenantDb(req.tenantId);
     const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema).populate('client');
     const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const proposal = new Proposal(req.body);
     await proposal.save();
 
     // Update the client's proposals array
+    let client = {};
     const clientId = proposal.client;
     if (clientId) {
-      const client = await Client.findById(clientId);
+      client = await Client.findById(clientId);
       if (client) {
         client.proposals.push(proposal._id);
         client.statusHistory.push({
@@ -43,9 +45,21 @@ export const createProposal = async (req, res) => {
       }
     }
 
+    // Create a notification for the proposal creation
+    const notification = new Notification({
+      title: 'New Proposal Created',
+      message: `Proposal ${proposal.proposalNumber} has been created for client ${client.name}`,
+      type: 'proposals',
+      id: proposal._id,
+    });
+
+    await notification.save();
+
     // const proposals = await Proposal.find({}).populate('client');
-    res.status(201).send(proposal);
+    console.log('Proposal created:', proposal);
+    res.status(201).send(await proposal);
   } catch (error) {
+    console.log('Error creating proposal:', error);
     res.status(400).send(error);
   }
 };
@@ -133,6 +147,7 @@ export const deleteProposal = async (req, res) => {
     const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
     const Client = db.models.Client || db.model('Client', clientSchema);
     const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const proposal = await Proposal.findById(req.params.id).populate('client');
     if (!proposal) {
       return res.status(404).send();
@@ -146,14 +161,14 @@ export const deleteProposal = async (req, res) => {
       const bucketName = 'invoicesproposals';
 
       if (proposal.proposalNumber && proposal.client?.name) {
-        const filePath = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
+        const filePath = `${req.tenantId}/proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
         const file = storage.bucket(bucketName).file(filePath);
         await file.delete().catch((err) => {
           console.error('Error deleting proposal PDF from GCS:', err.message);
         });
       }
       if (proposal.signedPdfUrl) {
-        const signedFilePath = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}_signed.pdf`;
+        const signedFilePath = `${req.tenantId}/proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}_signed.pdf`;
         const signedFile = storage.bucket(bucketName).file(signedFilePath);
         await signedFile.delete().catch((err) => {
           console.error('Error deleting signed proposal PDF from GCS:', err.message);
@@ -188,6 +203,14 @@ export const deleteProposal = async (req, res) => {
       }
     }
 
+    const notification = new Notification({
+      title: 'Proposal Deleted',
+      message: `Proposal ${proposal.proposalNumber} has been deleted`,
+      type: 'proposals',
+      id: proposal._id,
+    });
+    await notification.save();
+
     return res.status(200).send({ message: 'Proposal deleted successfully' });
   } catch (error) {
     console.error('Unhandled error in deleteProposal:', error.message);
@@ -201,9 +224,16 @@ export const createProposalPdf = async (req, res) => {
     const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
     const Client = db.models.Client || db.model('Client', clientSchema);
     const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     // Parse credentials from environment variable
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+
+    const client = await Client.findById(req.body.proposal.client._id).populate('proposals');
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    // Check if the client has reached the maximum number of proposals
 
     // Initialize Google Cloud Storage client
     const storage = new Storage({
@@ -353,7 +383,7 @@ export const createProposalPdf = async (req, res) => {
 
     // Upload the generated PDF to Google Cloud Storage
     const bucketName = 'invoicesproposals';
-    const objectName = `proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
+    const objectName = `${req.tenantId}/proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
 
     // Convert pdfBytes (Uint8Array) to a readable stream
     const bufferStream = new PassThrough();
@@ -372,6 +402,20 @@ export const createProposalPdf = async (req, res) => {
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+
+    client.statusHistory.push({
+      status: 'proposal pdf created',
+      date: new Date(),
+    });
+    await client.save();
+
+    const notification = new Notification({
+      title: 'Proposal PDF Created',
+      message: `Proposal PDF for ${proposal.proposalNumber} has been created successfully.`,
+      type: 'proposals',
+      id: proposal._id,
+    });
+    await notification.save();
 
     // Return the URL as the response
     res.json({ url: fileUrl });
@@ -595,7 +639,7 @@ export const uploadProposalWithSignature = async (req, res) => {
 
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
-    const objectName = `proposals/proposal_${proposalNumber}_${proposal.client.name}_signed.pdf`;
+    const objectName = `${tenantId}/proposals/proposal_${proposalNumber}_${proposal.client.name}_signed.pdf`;
 
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(objectName);

@@ -21,6 +21,30 @@ export const getFilesFromBucket = async (req, res) => {
       prefix: `${req.tenantId}/`,
     });
 
+    // if (files.length === 0) {
+    //   return res.status(404).json({ message: 'No files found in the bucket' });
+    // }
+    // // If you want to return all files without organizing them into folders
+    // const fileList = await Promise.all(
+    //   files.map(async (file) => {
+    //     const [url] = await file.getSignedUrl({
+    //       action: 'read',
+    //       expires: Date.now() + 15 * 60 * 1000, // URL valid for 15 minutes
+    //     });
+
+    //     return {
+    //       name: file.name,
+    //       size: file.metadata.size,
+    //       contentType: file.metadata.contentType,
+    //       updated: file.metadata.updated,
+    //       url,
+    //       isFolder: file.name.endsWith('/'),
+    //     };
+    //   })
+    // );
+
+    // res.json(fileList);
+
     const tenantPrefix = `${req.tenantId}/`;
     const folderSet = new Set();
     const folderMap = new Map();

@@ -17,6 +17,7 @@ export const createInvoice = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   const Client = db.models.Client || db.model('Client', clientSchema);
+  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   try {
     // Step 1: Create and save the new invoice
     const invoice = new Invoice(req.body);
@@ -35,6 +36,14 @@ export const createInvoice = async (req, res) => {
       });
       await client.save();
     }
+
+    const notification = new Notification({
+      title: 'New Invoice Created',
+      message: `Invoice ${invoice.invoiceNumber} has been created for client ${client.name}`,
+      type: 'invoices',
+      id: invoice._id,
+    });
+    await notification.save();
 
     // Step 3: Attach the invoice to the client's list of invoices
     client.invoices.push(invoice._id);
@@ -148,24 +157,21 @@ export const updateInvoice = async (req, res) => {
 
 // Delete an invoice by ID
 export const deleteInvoice = async (req, res) => {
-  console.log('deleteInvoice called with params:', req.params);
-  let invoice;
   try {
+    let invoice;
     const db = await getTenantDb(req.tenantId);
     const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
     const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
 
     // Find and delete the invoice
     invoice = await Invoice.findById(req.params.id).populate('client');
-    console.log('Fetched invoice:', invoice);
     if (!invoice) {
-      console.log('Invoice not found');
       return res.status(404).json({ message: 'Invoice not found' });
     }
 
     // Remove the invoice from the client's invoices array and update status
     const client = await Client.findById(invoice.client);
-    console.log('Fetched client:', client);
     if (client) {
       client.invoices.pull(invoice._id);
       client.statusHistory.push({
@@ -173,17 +179,14 @@ export const deleteInvoice = async (req, res) => {
         date: new Date(),
       });
       await client.save();
-      console.log('Client updated after invoice deletion');
     }
 
     // Delete the invoice document
     await Invoice.findByIdAndDelete(req.params.id);
-    console.log('Invoice document deleted from DB');
 
     // Retrieve all invoices and populate the client field
     const invoices = await Invoice.find().populate('client');
     res.status(200).json(invoices);
-    console.log('Response sent with updated invoices');
   } catch (error) {
     console.error('Error in deleteInvoice:', error);
     res.status(500).json({ message: error.message });
@@ -199,14 +202,20 @@ export const deleteInvoice = async (req, res) => {
       const filePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
       const file = storage.bucket(bucketName).file(filePath);
       await file.delete();
-      console.log('Deleted invoice PDF from GCS:', filePath);
     }
     if (invoice && invoice.signedPdfUrl) {
       const signedFilePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
       const signedFile = storage.bucket(bucketName).file(signedFilePath);
       await signedFile.delete();
-      console.log('Deleted signed invoice PDF from GCS:', signedFilePath);
     }
+    const notification = new Notification({
+      title: 'Invoice Deleted',
+      message: `Invoice ${invoice.invoiceNumber} has been deleted`,
+      type: 'invoices',
+      id: invoice._id,
+    });
+    await notification.save();
+    res.status(200).json({ message: 'Invoice deleted successfully' });
   } catch (err) {
     console.error('Error deleting invoice PDF from GCS:', err);
   }
@@ -456,22 +465,23 @@ export const downloadInvoicePdf = async (req, res) => {
 
 export const uploadPdfWithSignature = async (req, res) => {
   // Use token-based tenant ID extraction, matching proposalController.js
-  const token = req.body.token || req.headers.authorization?.split(' ')[1];
-  const tokenDoc = await Token.findOne({ token: token });
-  if (!tokenDoc) {
-    return res.status(404).json({ message: 'Token not found' });
-  }
-  let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid token' });
-  }
-  const tenantId = decoded.tenantId;
-  const db = await getTenantDb(tenantId);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
-  const Notification = db.models.Notification || db.model('Notification', notificationSchema);
-  try {
+    const token = req.body.token || req.headers.authorization?.split(' ')[1];
+    const tokenDoc = await Token.findOne({ token: token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    const tenantId = decoded.tenantId;
+    const db = await getTenantDb(tenantId);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const { pdfUrl, signatureImage, invoiceNumber, invoiceId } = req.body;
 
     // Fetch the invoice and populate the client field
@@ -582,12 +592,13 @@ export const uploadPdfWithSignature = async (req, res) => {
 };
 
 export const createToken = async (req, res) => {
-  const db = await getTenantDb(req.tenantId);
-  const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   try {
     const { invoiceId, data } = req.body;
     const { invoiceUrl } = data;
-
+    const decoded = jwt.decode(data.token || '', { complete: false });
+    const tenantId = decoded?.tenantId || req.tenantId;
+    const db = await getTenantDb(tenantId);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
     // Find the invoice by ID
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {
@@ -596,7 +607,7 @@ export const createToken = async (req, res) => {
 
     // Prepare token data
     const tokenData = {
-      tenantId: req.tenantId,
+      tenantId: tenantId,
       invoiceId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
       invoiceUrl,

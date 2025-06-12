@@ -96,6 +96,10 @@ const invoiceSchema = new Schema({
   token: {
     type: String,
   },
+  projectAddress: {
+    type: String,
+    default: '',
+  },
 });
 
 // Automatically update updatedAt when document is changed

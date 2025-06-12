@@ -63,6 +63,10 @@ const proposalSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'MaterialsList',
   },
+  projectAddress: {
+    type: String,
+    default: '',
+  },
 });
 
 proposalSchema.pre('save', function (next) {

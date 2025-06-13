@@ -50,4 +50,21 @@ const materialsListSchema = new Schema({
   },
 });
 
+materialsListSchema.pre('save', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+materialsListSchema.pre('findOneAndUpdate', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+materialsListSchema.pre('updateOne', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+materialsListSchema.pre('updateMany', function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
 export default materialsListSchema;

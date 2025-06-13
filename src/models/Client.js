@@ -50,10 +50,12 @@ const clientSchema = new Schema({
   givenName: {
     type: String,
     required: false,
+    default: '',
   },
   familyName: {
     type: String,
     required: false,
+    default: '',
   },
   name: {
     type: String,
@@ -66,9 +68,11 @@ const clientSchema = new Schema({
   },
   email: {
     type: String, // No uniqueness and can be an empty string
+    default: '',
   },
   phone: {
     type: String, // No uniqueness and can be an empty string
+    default: '',
   },
   address: {
     type: String,
@@ -141,4 +145,14 @@ clientSchema.pre('findOneAndUpdate', function (next) {
   this.set({ updatedAt: Date.now() });
   next();
 });
+
+clientSchema.pre('updateOne', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
+clientSchema.pre('updateMany', function (next) {
+  this.set({ updatedAt: Date.now() });
+  next();
+});
+
 export default clientSchema;

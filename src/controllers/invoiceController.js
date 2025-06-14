@@ -732,3 +732,89 @@ export const revokeToken = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const internalUploadInvoiceWithSignature = async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    const { signature } = req.body;
+
+    if (!invoiceId) {
+      return res.status(400).json({ message: 'Missing invoice ID' });
+    }
+
+    const db = await getTenantDb(req.tenantId);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
+    const invoice = await Invoice.findById(invoiceId).populate('client');
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    const now = new Date();
+    const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+
+    const signatureData = signature?.replace(/^data:image\/\w+;base64,/, '');
+    const signatureBuffer = Buffer.from(signatureData, 'base64');
+
+    const response = await fetch(invoice.fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch original PDF: ${response.statusText}`);
+    }
+
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const signatureEmbed = await pdfDoc.embedPng(signatureBuffer);
+    const signatureDims = signatureEmbed.scale(0.5);
+    const firstPage = pdfDoc.getPages()[0];
+
+    firstPage.drawImage(signatureEmbed, {
+      x: 350,
+      y: 190,
+      width: signatureDims.width / 5,
+      height: signatureDims.height / 5,
+    });
+
+    const updatedPdfBytes = await pdfDoc.save();
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+    const storage = new Storage({ credentials: gcsCredentials });
+    const bucketName = 'invoicesproposals';
+    const objectName = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(Buffer.from(updatedPdfBytes), {
+      metadata: { contentType: 'application/pdf' },
+      predefinedAcl: 'publicRead',
+    });
+
+    invoice.signedPdfUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${Date.now()}`;
+    invoice.status = 'signed';
+    await invoice.save();
+
+    const client = await Client.findById(invoice.client);
+    if (client) {
+      client.statusHistory.push({
+        status: 'invoice signed',
+        date: new Date(),
+      });
+      await client.save();
+    }
+
+    const notification = new Notification({
+      title: 'Invoice Signed Internally',
+      message: `Invoice ${invoice.invoiceNumber} has been signed internally`,
+      type: 'invoices',
+      id: invoice._id,
+    });
+
+    await notification.save();
+
+    res.json({ url: invoice.signedPdfUrl, signedInvoice: invoice });
+  } catch (error) {
+    console.error('Error in internalUploadInvoiceWithSignature:', error);
+    res.status(500).json({ message: error.message });
+  }
+};

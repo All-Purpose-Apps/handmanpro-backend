@@ -9,6 +9,7 @@ import {
   createInvoicePdf,
   downloadInvoicePdf,
   uploadPdfWithSignature,
+  internalUploadInvoiceWithSignature,
   createToken,
   verifyToken,
   revokeToken,
@@ -29,6 +30,8 @@ router.post('/create-pdf', createInvoicePdf);
 router.get('/download-pdf/:url', downloadInvoicePdf);
 
 router.post('/upload-pdf-with-signature', uploadPdfWithSignature);
+
+router.post('/internal-upload-pdf-with-signature/:id', internalUploadInvoiceWithSignature);
 
 router.post('/create-token', createToken);
 

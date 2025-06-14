@@ -74,6 +74,7 @@ export const getInvoice = async (req, res) => {
   const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
   try {
     const invoice = await Invoice.findById(req.params.id).populate('client');
+
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found' });
     }
@@ -223,6 +224,9 @@ export const deleteInvoice = async (req, res) => {
 export const createInvoicePdf = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
+    const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     // Parse credentials from environment variable
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -389,6 +393,32 @@ export const createInvoicePdf = async (req, res) => {
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
+
+    // Update the invoice with the status only
+    const updatedInvoice = await Invoice.findByIdAndUpdate(invoice._id, { status: 'invoice pdf created' }, { new: true });
+
+    if (!updatedInvoice) {
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+    // Update the client with the new invoice
+    const client = await Client.findById(invoice.client);
+    if (client) {
+      client.invoices.push(updatedInvoice._id);
+      client.statusHistory.push({
+        status: 'invoice pdf created',
+        date: new Date(),
+      });
+      await client.save();
+    }
+    // Create a notification for the client
+    const notification = new Notification({
+      title: 'Invoice PDF Created',
+      message: `Invoice ${updatedInvoice.invoiceNumber} has been created`,
+      type: 'invoices',
+      id: updatedInvoice._id,
+    });
+    await notification.save();
+    // Send the notification to the client
 
     // Return the URL as the response
     res.json({ url: fileUrl });

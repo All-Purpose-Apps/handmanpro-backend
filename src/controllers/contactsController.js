@@ -81,6 +81,17 @@ export const createGoogleContact = async (req, res) => {
       },
     });
 
+    const db = await getTenantDb(req.tenantId);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+
+    const notification = new Notification({
+      title: 'Contact Created',
+      message: `Contact ${givenName} ${familyName} was successfully created.`,
+      type: 'contacts',
+    });
+    await notification.save();
+    emitNotification(req.tenantId, notification);
+
     // Respond with the created contact details
     res.json({
       msg: 'Contact created successfully',

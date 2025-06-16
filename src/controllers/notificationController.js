@@ -1,9 +1,11 @@
 import { getTenantDb } from '../config/db.js';
 import notificationSchema from '../models/Notification.js';
+import { emitNotification } from '../index.js';
 
 export const getNotifications = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+  console.log('Fetching notifications for tenant:', req.tenantId);
   try {
     const notifications = await Notification.find();
     res.status(200).json(notifications);
@@ -19,6 +21,9 @@ export const createNotification = async (req, res) => {
   const newNotification = new Notification(notification);
   try {
     await newNotification.save();
+    if (req.tenantId) {
+      emitNotification(req.tenantId, newNotification);
+    }
     res.status(201).json(newNotification);
   } catch (error) {
     res.status(409).json({ message: error.message });
@@ -54,6 +59,7 @@ export const markAsRead = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const { id } = req.params;
+  console.log('Marking notification as read:', id);
   try {
     await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
     res.json({ message: 'Notification marked as read.' });

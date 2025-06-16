@@ -5,6 +5,7 @@ import clientSchema from '../models/Client.js';
 import invoiceSchema from '../models/Invoice.js';
 import notificationSchema from '../models/Notification.js';
 import proposalSchema from '../models/Proposal.js';
+import { emitNotification } from '../index.js';
 
 export const listGmailMessages = async (req, res) => {
   const oauth2Client = req.oauth2Client;
@@ -87,6 +88,7 @@ export const sendEmail = async (req, res) => {
       id: invoice._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
     res.status(200).json({ msg: 'Email sent successfully!' });
   } catch (error) {
     console.error('Error sending email:', error);
@@ -176,6 +178,7 @@ export const sendProposal = async (req, res) => {
       id: proposal._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
     res.status(200).json({ msg: 'Email sent successfully!' });
   } catch (error) {
     console.error('Error sending email:', error);
@@ -247,6 +250,7 @@ export const sendReviewRequestEmail = async (req, res) => {
       type: 'email',
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
     res.status(200).json({ msg: 'Review request email sent successfully!' });
   } catch (error) {
     console.error('Error sending review request email:', error);

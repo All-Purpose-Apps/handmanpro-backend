@@ -17,6 +17,20 @@ import filesRoutes from './routes/filesRoutes.js';
 import expressListRoutes from 'express-list-routes';
 import { authenticateGoogleAPI } from './middleware/googleAuthMiddleware.js';
 import materialsListRoutes from './routes/materialsListRoutes.js';
+import Notification from './models/Notification.js';
+
+export const emitNotification = async (tenantId, notification) => {
+  console.log('Emitting Notification to tenant:', tenantId);
+  const sockets = await io.in(tenantId).fetchSockets();
+  console.log(
+    `Sockets in room [${tenantId}]:`,
+    sockets.map((s) => s.id)
+  );
+  io.to(tenantId).emit('newNotification', notification);
+};
+
+// socket.io
+import { Server } from 'socket.io';
 
 // connectDB();
 
@@ -82,4 +96,36 @@ app.use('/api/files', filesRoutes);
 // expressListRoutes(app);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));
+
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      const allowedOrigins = ['http://localhost:5173', 'http://192.168.1.213:5173', 'https://handmanpro.netlify.app'];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  },
+});
+
+io.use((socket, next) => {
+  // Extract tenantId from headers
+  const tenantId = socket.handshake.headers['tenant-id'];
+  console.log('Socket connection attempt with tenantId:', tenantId);
+  if (!tenantId) return next(new Error('tenantId is required'));
+  socket.tenantId = tenantId;
+  socket.join(tenantId);
+  next();
+});
+
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});

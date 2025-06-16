@@ -5,6 +5,7 @@ import clientSchema from '../models/Client.js';
 import invoiceSchema from '../models/Invoice.js';
 import proposalSchema from '../models/Proposal.js';
 import notificationSchema from '../models/Notification.js';
+import { emitNotification } from '../index.js';
 
 const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
 const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -169,6 +170,7 @@ export const deleteContact = async (req, res) => {
       id: client._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     res.json({ msg: 'Contact, client, invoices, and proposals deleted successfully' });
   } catch (error) {

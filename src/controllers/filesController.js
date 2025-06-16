@@ -4,6 +4,7 @@ import invoiceSchema from '../models/Invoice.js';
 import clientSchema from '../models/Client.js';
 import notificationSchema from '../models/Notification.js';
 import proposalSchema from '../models/Proposal.js';
+import { emitNotification } from '../index.js';
 // Load GCS credentials from environment variable (same as proposalController.js)
 const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
 const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -156,6 +157,7 @@ export const deleteFileFromBucket = async (req, res) => {
           id: invoice._id,
         });
         await notification.save();
+        emitNotification(req.tenantId, notification);
       }
     }
 
@@ -187,6 +189,7 @@ export const deleteFileFromBucket = async (req, res) => {
           id: proposal._id,
         });
         await notification.save();
+        emitNotification(req.tenantId, notification);
       }
     }
 

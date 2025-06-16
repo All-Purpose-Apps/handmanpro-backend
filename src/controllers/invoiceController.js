@@ -12,6 +12,7 @@ import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import Token from '../models/Token.js';
 import notificationSchema from '../models/Notification.js';
+import { emitNotification } from '../index.js';
 
 export const createInvoice = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
@@ -44,6 +45,7 @@ export const createInvoice = async (req, res) => {
       id: invoice._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     // Step 3: Attach the invoice to the client's list of invoices
     client.invoices.push(invoice._id);
@@ -116,6 +118,7 @@ export const updateInvoice = async (req, res) => {
         id: updatedInvoice._id,
       });
       await notification.save();
+      emitNotification(req.tenantId, notification);
     }
     if (!updatedInvoice) {
       return res.status(404).json({ message: 'Invoice not found' });
@@ -215,6 +218,7 @@ export const deleteInvoice = async (req, res) => {
       id: invoice._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
     res.status(200).json({ message: 'Invoice deleted successfully' });
   } catch (err) {
     console.error('Error deleting invoice PDF from GCS:', err);
@@ -418,6 +422,7 @@ export const createInvoicePdf = async (req, res) => {
       id: updatedInvoice._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
     // Send the notification to the client
 
     // Return the URL as the response
@@ -608,8 +613,8 @@ export const uploadPdfWithSignature = async (req, res) => {
       type: 'invoices',
       id: invoice._id,
     });
-
     await notification.save();
+    emitNotification(tenantId, notification);
 
     // Construct the public URL with cache-busting query string
     const fileUrl = `https://storage.googleapis.com/${bucketName}/${objectName}?t=${new Date().getTime()}`;
@@ -809,8 +814,8 @@ export const internalUploadInvoiceWithSignature = async (req, res) => {
       type: 'invoices',
       id: invoice._id,
     });
-
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     res.json({ url: invoice.signedPdfUrl, signedInvoice: invoice });
   } catch (error) {

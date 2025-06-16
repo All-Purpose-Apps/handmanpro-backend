@@ -1,3 +1,4 @@
+import { emitNotification } from '../index.js';
 import { getTenantDb } from '../config/db.js';
 import proposalSchema from '../models/Proposal.js';
 
@@ -52,8 +53,8 @@ export const createProposal = async (req, res) => {
       type: 'proposals',
       id: proposal._id,
     });
-
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     // const proposals = await Proposal.find({}).populate('client');
     console.log('Proposal created:', proposal);
@@ -210,6 +211,7 @@ export const deleteProposal = async (req, res) => {
       id: proposal._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     return res.status(200).send({ message: 'Proposal deleted successfully' });
   } catch (error) {
@@ -416,6 +418,7 @@ export const createProposalPdf = async (req, res) => {
       id: proposal._id,
     });
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     // Return the URL as the response
     res.json({ url: fileUrl });
@@ -678,8 +681,8 @@ export const uploadProposalWithSignature = async (req, res) => {
       type: 'proposals',
       id: proposal._id,
     });
-
     await notification.save();
+    emitNotification(tenantId, notification);
 
     res.json({ url: proposal.signedPdfUrl, signedProposal: proposal });
   } catch (error) {
@@ -777,8 +780,8 @@ export const internalUploadProposalWithSignature = async (req, res) => {
       type: 'proposals',
       id: proposal._id,
     });
-
     await notification.save();
+    emitNotification(req.tenantId, notification);
 
     res.json({ url: proposal.signedPdfUrl, signedProposal: proposal });
   } catch (error) {

@@ -26,22 +26,4 @@ const notificationSchema = new mongoose.Schema({
   },
 });
 
-// Automatically update the date when the document is changed
-// notificationSchema.pre('save', function (next) {
-//   this.date = Date.now();
-//   next();
-// });
-// notificationSchema.pre('findOneAndUpdate', function (next) {
-//   this.set({ date: Date.now() });
-//   next();
-// });
-// notificationSchema.pre('updateOne', function (next) {
-//   this.set({ date: Date.now() });
-//   next();
-// });
-// notificationSchema.pre('updateMany', function (next) {
-//   this.set({ date: Date.now() });
-//   next();
-// });
-
 export default notificationSchema;

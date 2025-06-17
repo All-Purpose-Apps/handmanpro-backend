@@ -27,19 +27,24 @@ export const getTenantDb = async (tenantId) => {
 
   const uri = `${process.env.MONGODB_URI_BASE}_${tenantId}`;
 
-  const connectPromise = mongoose.createConnection(uri);
+  const connection = mongoose.createConnection(uri);
+
+  const connectPromise = new Promise((resolve, reject) => {
+    connection.once('open', () => resolve(connection));
+    connection.on('error', reject);
+  });
 
   connectionPromises[tenantId] = connectPromise;
 
-  const connection = await connectPromise;
+  const readyConnection = await connectPromise;
 
   const timeout = setTimeout(() => {
-    connection.close();
+    readyConnection.close();
     delete connectionCache[tenantId];
   }, CONNECTION_TTL_MS);
 
-  connectionCache[tenantId] = { connection, timeout };
+  connectionCache[tenantId] = { connection: readyConnection, timeout };
   delete connectionPromises[tenantId];
 
-  return connection;
+  return readyConnection;
 };

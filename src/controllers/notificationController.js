@@ -5,7 +5,7 @@ import { emitNotification } from '../index.js';
 export const getNotifications = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const Notification = db.models.Notification || db.model('Notification', notificationSchema);
-  console.log('Fetching notifications for tenant:', req.tenantId);
+
   try {
     const notifications = await Notification.find();
     res.status(200).json(notifications);

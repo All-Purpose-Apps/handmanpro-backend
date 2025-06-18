@@ -165,6 +165,8 @@ export const updateInvoice = async (req, res) => {
 export const deleteInvoice = async (req, res) => {
   try {
     let invoice;
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
     const db = await getTenantDb(req.tenantId);
     const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
     const Client = db.models.Client || db.model('Client', clientSchema);
@@ -192,27 +194,25 @@ export const deleteInvoice = async (req, res) => {
 
     // Retrieve all invoices and populate the client field
     const invoices = await Invoice.find().populate('client');
-    res.status(200).json(invoices);
-  } catch (error) {
-    console.error('Error in deleteInvoice:', error);
-    res.status(500).json({ message: error.message });
-  }
-
-  try {
-    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
-    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
-
     const storage = new Storage({ credentials: gcsCredentials });
     const bucketName = 'invoicesproposals';
     if (invoice && invoice.invoiceNumber && invoice.client?.name) {
       const filePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}.pdf`;
       const file = storage.bucket(bucketName).file(filePath);
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (err) {
+        console.log(`File not found: ${filePath}`);
+      }
     }
     if (invoice && invoice.signedPdfUrl) {
       const signedFilePath = `${req.tenantId}/invoices/invoice_${invoice.invoiceNumber}_${invoice.client.name}_signed.pdf`;
       const signedFile = storage.bucket(bucketName).file(signedFilePath);
-      await signedFile.delete();
+      try {
+        await signedFile.delete();
+      } catch (err) {
+        console.log(`Signed file not found: ${signedFilePath}`);
+      }
     }
     const notification = new Notification({
       title: 'Invoice Deleted',
@@ -222,9 +222,10 @@ export const deleteInvoice = async (req, res) => {
     });
     await notification.save();
     emitNotification(req.tenantId, notification);
-    res.status(200).json({ message: 'Invoice deleted successfully' });
-  } catch (err) {
-    console.error('Error deleting invoice PDF from GCS:', err);
+    res.status(200).json(invoices);
+  } catch (error) {
+    console.error('Error in deleteInvoice:', error);
+    res.status(500).json({ message: error.message });
   }
 };
 

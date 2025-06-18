@@ -99,7 +99,6 @@ const invoiceSchema = new Schema({
   materialList: {
     type: Schema.Types.ObjectId,
     ref: 'MaterialList',
-    default: '',
   },
   projectAddress: {
     type: String,

@@ -67,6 +67,18 @@ const proposalSchema = new Schema({
     type: String,
     default: '',
   },
+  projectCity: {
+    type: String,
+    default: '',
+  },
+  projectState: {
+    type: String,
+    default: '',
+  },
+  projectZip: {
+    type: String,
+    default: '',
+  },
 });
 
 proposalSchema.pre('save', function (next) {

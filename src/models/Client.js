@@ -78,6 +78,22 @@ const clientSchema = new Schema({
     type: String,
     default: '',
   },
+  streetAddress: {
+    type: String,
+    default: '',
+  },
+  city: {
+    type: String,
+    default: '',
+  },
+  state: {
+    type: String,
+    default: '',
+  },
+  zip: {
+    type: String,
+    default: '',
+  },
   invoices: {
     type: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
   },

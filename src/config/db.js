@@ -1,8 +1,13 @@
 import mongoose from 'mongoose';
+import { LRUCache } from 'lru-cache';
 
 const CONNECTION_TTL_MS = 1000 * 60 * 10; // 10 minutes
 
-const connectionCache = {}; // Will now store { connection, timeout }
+const connectionCache = new LRUCache({
+  max: 200,
+  ttl: CONNECTION_TTL_MS,
+  dispose: (value) => value.connection.close(),
+});
 const connectionPromises = {};
 
 export const getTenantDb = async (tenantId) => {
@@ -11,14 +16,10 @@ export const getTenantDb = async (tenantId) => {
     throw new Error('Tenant ID is required');
   }
 
-  if (connectionCache[tenantId]) {
-    clearTimeout(connectionCache[tenantId].timeout); // Reset TTL
-    connectionCache[tenantId].timeout = setTimeout(() => {
-      connectionCache[tenantId].connection.close();
-      delete connectionCache[tenantId];
-    }, CONNECTION_TTL_MS);
-
-    return connectionCache[tenantId].connection;
+  const cached = connectionCache.get(tenantId);
+  if (cached) {
+    connectionCache.set(tenantId, cached); // Refresh LRU position
+    return cached.connection;
   }
 
   if (connectionPromises[tenantId]) {
@@ -38,12 +39,7 @@ export const getTenantDb = async (tenantId) => {
 
   const readyConnection = await connectPromise;
 
-  const timeout = setTimeout(() => {
-    readyConnection.close();
-    delete connectionCache[tenantId];
-  }, CONNECTION_TTL_MS);
-
-  connectionCache[tenantId] = { connection: readyConnection, timeout };
+  connectionCache.set(tenantId, { connection: readyConnection });
   delete connectionPromises[tenantId];
 
   return readyConnection;

@@ -62,7 +62,6 @@ export const updateMaterialInList = async (req, res) => {
 
   const { id } = req.params;
   const { name, price } = req.body;
-  console.log('Updating material with ID:', id, 'Name:', name, 'Price:', price);
 
   try {
     const existingMaterial = await Materials.findById(id);
@@ -131,7 +130,6 @@ export const updateMaterialsList = async (req, res) => {
   const Materials = db.models.Materials || db.model('Materials', materialsSchema);
 
   const { id } = req.params;
-  console.log('Updating materials list for proposal:', id);
 
   if (!id || id === 'null') {
     console.warn('updateMaterialsList: Missing or invalid ID, returning empty result.');

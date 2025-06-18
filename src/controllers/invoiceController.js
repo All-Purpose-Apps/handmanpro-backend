@@ -54,6 +54,7 @@ export const createInvoice = async (req, res) => {
     // Step 4: Respond with the created invoice
     res.status(201).json(invoice);
   } catch (error) {
+    console.error('Error creating invoice:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -66,6 +67,7 @@ export const getInvoices = async (req, res) => {
     const invoices = await Invoice.find().populate('client');
     res.status(200).json(invoices);
   } catch (error) {
+    console.error('Error fetching invoices:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -82,6 +84,7 @@ export const getInvoice = async (req, res) => {
     }
     res.status(200).json(invoice);
   } catch (error) {
+    console.error('Error fetching invoice:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -445,6 +448,7 @@ export const downloadInvoicePdf = async (req, res) => {
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     } catch (err) {
+      console.error('Error verifying token:', err);
       return res.status(401).json({ message: 'Invalid token' });
     }
     const tenantId = decoded.tenantId;
@@ -668,6 +672,7 @@ export const createToken = async (req, res) => {
     // Respond with the generated token
     res.status(200).json({ token: tokenString });
   } catch (error) {
+    console.error('Error creating token:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -734,6 +739,7 @@ export const revokeToken = async (req, res) => {
       res.status(200).json({ message: 'Token revoked successfully' });
     });
   } catch (error) {
+    console.error(error);
     res.status(400).json({ message: error.message });
   }
 };

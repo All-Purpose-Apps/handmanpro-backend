@@ -37,6 +37,7 @@ export const listCalendarEvents = async (req, res) => {
 
     res.json(allEvents); // Return all the events
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
@@ -65,6 +66,7 @@ export const getCalendarEvent = async (req, res) => {
     });
     res.json(response.data);
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
@@ -108,6 +110,7 @@ export const createCalendarEvent = async (req, res) => {
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
@@ -156,6 +159,7 @@ export const updateCalendarEvent = async (req, res) => {
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
@@ -198,6 +202,7 @@ export const deleteCalendarEvent = async (req, res) => {
     const events = response.data.items || [];
     res.json(events);
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };
@@ -221,6 +226,7 @@ export const listCalendars = async (req, res) => {
     const calendars = response.data.items || [];
     res.json(calendars);
   } catch (error) {
+    console.error(error);
     res.status(error.response.data.error.code).send(error.response.data.error.message);
   }
 };

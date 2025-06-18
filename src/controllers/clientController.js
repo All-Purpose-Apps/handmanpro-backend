@@ -11,6 +11,7 @@ const getClients = async (req, res) => {
     const clients = await Client.find().lean();
     res.json(clients);
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
@@ -32,7 +33,7 @@ const createClient = async (req, res) => {
 
     res.json(client);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).send(error);
   }
 };
@@ -109,6 +110,7 @@ const getClient = async (req, res) => {
     }
     res.json(client);
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
@@ -128,6 +130,7 @@ const deleteClient = async (req, res) => {
     // }
     // res.json({ msg: 'Client deleted successfully' });
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
@@ -192,7 +195,6 @@ const clearClientStatusHistory = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const { Client } = getModels(db);
 
-  console.log('Clearing client status history');
   const { clientId } = req.body;
   if (!clientId) {
     return res.status(400).json({ msg: 'Client ID is required' });

@@ -57,7 +57,6 @@ export const createProposal = async (req, res) => {
     emitNotification(req.tenantId, notification);
 
     // const proposals = await Proposal.find({}).populate('client');
-    console.log('Proposal created:', proposal);
     res.status(201).send(await proposal);
   } catch (error) {
     console.log('Error creating proposal:', error);
@@ -73,6 +72,7 @@ export const getAllProposals = async (req, res) => {
     const proposals = await Proposal.find({}).populate('client');
     res.status(200).send(proposals);
   } catch (error) {
+    console.error('Error fetching proposals:', error);
     res.status(500).send(error);
   }
 };
@@ -88,6 +88,7 @@ export const getProposalById = async (req, res) => {
     }
     res.status(200).send(proposal);
   } catch (error) {
+    console.error('Error fetching proposal:', error);
     res.status(500).send(error);
   }
 };
@@ -610,6 +611,7 @@ export const revokeProposalToken = async (req, res) => {
     await tokenDoc.save();
     res.status(200).json({ message: 'Token revoked successfully' });
   } catch (error) {
+    console.error('Error revoking token:', error);
     res.status(400).json({ message: error.message });
   }
 };

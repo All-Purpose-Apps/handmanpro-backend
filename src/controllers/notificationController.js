@@ -10,6 +10,7 @@ export const getNotifications = async (req, res) => {
     const notifications = await Notification.find();
     res.status(200).json(notifications);
   } catch (error) {
+    console.error(error);
     res.status(404).json({ message: error.message });
   }
 };
@@ -26,6 +27,7 @@ export const createNotification = async (req, res) => {
     }
     res.status(201).json(newNotification);
   } catch (error) {
+    console.error(error);
     res.status(409).json({ message: error.message });
   }
 };
@@ -38,6 +40,7 @@ export const deleteNotification = async (req, res) => {
     await Notification.findByIdAndRemove(id);
     res.json({ message: 'Notification deleted successfully.' });
   } catch (error) {
+    console.error(error);
     res.status(409).json({ message: error.message });
   }
 };
@@ -51,6 +54,7 @@ export const updateNotification = async (req, res) => {
     await Notification.findByIdAndUpdate(id, { title, message, isRead }, { new: true });
     res.json({ message: 'Notification updated successfully.' });
   } catch (error) {
+    console.error(error);
     res.status(409).json({ message: error.message });
   }
 };
@@ -59,11 +63,12 @@ export const markAsRead = async (req, res) => {
   const db = await getTenantDb(req.tenantId);
   const Notification = db.models.Notification || db.model('Notification', notificationSchema);
   const { id } = req.params;
-  console.log('Marking notification as read:', id);
+
   try {
     await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
     res.json({ message: 'Notification marked as read.' });
   } catch (error) {
+    console.error(error);
     res.status(409).json({ message: error.message });
   }
 };
@@ -75,6 +80,7 @@ export const markAllAsRead = async (req, res) => {
     await Notification.updateMany({}, { isRead: true });
     res.json({ message: 'All notifications marked as read.' });
   } catch (error) {
+    console.error(error);
     res.status(409).json({ message: error.message });
   }
 };
@@ -86,6 +92,7 @@ export const clearNotifications = async (req, res) => {
     await Notification.deleteMany({});
     res.json({ message: 'All notifications cleared.' });
   } catch (error) {
+    console.error(error);
     console.error('Error clearing notifications:', error);
     res.status(409).json({ message: error.message });
   }

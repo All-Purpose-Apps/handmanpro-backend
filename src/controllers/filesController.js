@@ -241,19 +241,3 @@ export const showDeletedFilesInBucket = async (req, res) => {
     res.status(500).json({ error: 'Failed to list deleted files from bucket' });
   }
 };
-
-// function to rename a file in the bucket
-export const renameFileInBucket = async (req, res) => {
-  console.log(req.body);
-  const { oldbaseName, newFileName } = req.body;
-  console.log('Renaming file:', oldFileName, 'to', newFileName);
-
-  try {
-    const file = storage.bucket(bucketName).file(oldFileName);
-    await file.move(newFileName);
-    res.status(200).json({ message: 'File renamed successfully' });
-  } catch (error) {
-    console.error('Error renaming file in bucket:', error.message);
-    res.status(500).json({ error: 'Failed to rename file in bucket' });
-  }
-};

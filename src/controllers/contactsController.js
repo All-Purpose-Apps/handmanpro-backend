@@ -142,14 +142,12 @@ export const deleteContact = async (req, res) => {
       // Remove the fileUrl from the invoice
       if (invoice.fileUrl) {
         const filename = extractFilenameFromUrl(invoice.fileUrl);
-        console.log(`Deleting file: ${filename}`);
         const file = storage.bucket(bucketName).file(filename);
         await file.delete();
       }
 
       if (invoice.signedPdfUrl) {
         const filename = extractFilenameFromUrl(invoice.signedPdfUrl);
-        console.log(`Deleting file: ${filename}`);
         const signedFile = storage.bucket(bucketName).file(filename);
         await signedFile.delete();
       }
@@ -161,13 +159,11 @@ export const deleteContact = async (req, res) => {
       if (proposal.fileUrl) {
         const filename = extractFilenameFromUrl(proposal.fileUrl);
         const file = storage.bucket(bucketName).file(filename);
-        console.log(`Deleting file: ${filename}`);
         await file.delete();
       }
       if (proposal.signedPdfUrl) {
         const filename = extractFilenameFromUrl(proposal.signedPdfUrl);
         const signedFile = storage.bucket(bucketName).file(filename);
-        console.log(`Deleting file: ${filename}`);
 
         await signedFile.delete();
       }

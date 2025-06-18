@@ -110,8 +110,6 @@ export const sendEmail = async (req, res) => {
         status: 'sent',
         ...updateTimestamp,
       });
-
-      console.log('Client statusHistory, invoice status, and updatedAt fields updated successfully.');
     } catch (updateError) {
       console.error('Error updating client or invoice status and updatedAt:', updateError);
     }
@@ -201,8 +199,6 @@ export const sendProposal = async (req, res) => {
         status: 'sent to client',
         ...updateTimestamp,
       });
-
-      console.log('Client statusHistory, proposal status, and updatedAt fields updated successfully.');
     } catch (updateError) {
       console.error('Error updating client or proposal status and updatedAt:', updateError);
     }
@@ -266,8 +262,6 @@ export const sendReviewRequestEmail = async (req, res) => {
         $push: { statusHistory: { status: 'review requested', date: updateTimestamp.updatedAt } },
         ...updateTimestamp,
       });
-
-      console.log('Client statusHistory, and updatedAt fields updated successfully.');
     } catch (updateError) {
       console.error('Error updating client or invoice status and updatedAt:', updateError);
     }

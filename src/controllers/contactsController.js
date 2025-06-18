@@ -37,7 +37,6 @@ export const listContacts = async (req, res) => {
     });
 
     const connections = response.data.connections || [];
-
     // Filter out the specified email before mapping
     const formattedContacts = connections
       .filter((contact) => !(contact.emailAddresses && contact.emailAddresses[0].value === emailToFilterOut))
@@ -49,7 +48,11 @@ export const listContacts = async (req, res) => {
         const email = contact.emailAddresses ? contact.emailAddresses[0].value : '';
         const phone = contact.phoneNumbers ? contact.phoneNumbers[0].value : '';
         const address = contact.addresses ? contact.addresses[0].formattedValue : '';
-        return { resourceName, name, email, phone, address, givenName, familyName };
+        const streetAddress = contact.addresses ? contact.addresses[0].streetAddress : '';
+        const city = contact.addresses ? contact.addresses[0].city : '';
+        const state = contact.addresses ? contact.addresses[0].region : '';
+        const zip = contact.addresses ? contact.addresses[0].postalCode : '';
+        return { resourceName, name, email, phone, streetAddress, address, city, state, zip, givenName, familyName };
       });
 
     res.json(formattedContacts);

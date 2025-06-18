@@ -59,7 +59,7 @@ export const createProposal = async (req, res) => {
     // const proposals = await Proposal.find({}).populate('client');
     res.status(201).send(await proposal);
   } catch (error) {
-    console.log('Error creating proposal:', error);
+    console.error('Error creating proposal:', error);
     res.status(400).send(error);
   }
 };
@@ -360,7 +360,7 @@ export const createProposalPdf = async (req, res) => {
         color: rgb(1, 0, 0),
       });
     } else {
-      form.getTextField('Work At Address').setText(proposal.projectAddress || 'N/A');
+      form.getTextField('Work At Address 1').setText(proposal.projectAddress || 'N/A');
       form.getTextField('Work At Name').setText(proposal.client.name || 'N/A');
       form.getTextField('Work At Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
       form.getTextField('Work At Email').setText(proposal.client.email || 'N/A');
@@ -371,7 +371,7 @@ export const createProposalPdf = async (req, res) => {
     clientNameField.setText(`${proposal.client.name}` || 'N/A');
     clientNameField.updateAppearances(fontBold);
 
-    form.getTextField('Proposal Address').setText(proposal.client.address || 'N/A');
+    form.getTextField('Proposal Address 1').setText(proposal.client.address || 'N/A');
     form.getTextField('Proposal Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
     form.getTextField('Proposal Email').setText(proposal.client.email || 'N/A');
 
@@ -393,7 +393,7 @@ export const createProposalPdf = async (req, res) => {
 
     // **Proposal Items**
     let descriptionX = 40; // X position for descriptions column
-    let regularPriceX = 450; // X position for regular prices column
+    let regularPriceX = 445; // X position for regular prices column
     let discountPriceX = 510; // X position for discount prices column
     let startingY = 500; // Y position for the first item (adjust as necessary)
     let lineHeight = 20; // Line height between each row
@@ -413,7 +413,7 @@ export const createProposalPdf = async (req, res) => {
       firstPage.drawText(item.regularPrice ? item.regularPrice.toFixed(2) : '0.00', {
         x: regularPriceX,
         y: startingY - index * lineHeight,
-        size: 16,
+        size: 14,
         font: fontRegular,
         color: rgb(0, 0, 0),
       });
@@ -422,7 +422,7 @@ export const createProposalPdf = async (req, res) => {
       firstPage.drawText(item.discountPrice ? item.discountPrice.toFixed(2) : '0.00', {
         x: discountPriceX,
         y: startingY - index * lineHeight,
-        size: 16,
+        size: 14,
         font: fontRegular,
         color: rgb(0, 0, 0),
       });

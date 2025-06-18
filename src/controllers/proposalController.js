@@ -220,6 +220,84 @@ export const deleteProposal = async (req, res) => {
   }
 };
 
+// Delete multiple proposals by their IDs
+export const deleteMultipleProposals = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No proposal IDs provided' });
+    }
+
+    const db = await getTenantDb(req.tenantId);
+    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const Client = db.models.Client || db.model('Client', clientSchema);
+    const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
+    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
+    const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
+    const storage = new Storage({ credentials: gcsCredentials });
+    const bucketName = 'invoicesproposals';
+
+    for (const id of ids) {
+      const proposal = await Proposal.findById(id).populate('client');
+      if (!proposal) continue;
+
+      try {
+        if (proposal.proposalNumber && proposal.client?.name) {
+          const filePath = `${req.tenantId}/proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}.pdf`;
+          const file = storage.bucket(bucketName).file(filePath);
+          await file.delete().catch((err) => {
+            console.error('Error deleting proposal PDF from GCS:', err.message);
+          });
+        }
+        if (proposal.signedPdfUrl) {
+          const signedFilePath = `${req.tenantId}/proposals/proposal_${proposal.proposalNumber}_${proposal.client.name}_signed.pdf`;
+          const signedFile = storage.bucket(bucketName).file(signedFilePath);
+          await signedFile.delete().catch((err) => {
+            console.error('Error deleting signed proposal PDF from GCS:', err.message);
+          });
+        }
+      } catch (err) {
+        console.error('GCS cleanup failed:', err.message);
+      }
+
+      await Proposal.findByIdAndDelete(id);
+
+      if (proposal.materialsListId) {
+        try {
+          await MaterialsList.findByIdAndDelete(proposal.materialsListId);
+        } catch (err) {
+          console.error('Error deleting materials list:', err.message);
+        }
+      }
+
+      if (proposal.client) {
+        const client = await Client.findById(proposal.client);
+        if (client) {
+          client.proposals.pull(proposal._id);
+          client.statusHistory.push({
+            status: 'proposal deleted',
+            date: new Date(),
+          });
+          await client.save();
+        }
+      }
+    }
+    const notification = new Notification({
+      title: 'Proposals Deleted',
+      message: `Selected proposals have been deleted`,
+      type: 'proposals',
+    });
+    await notification.save();
+    emitNotification(req.tenantId, notification);
+    const proposals = await Proposal.find({}).populate('client');
+    return res.status(200).json(proposals);
+  } catch (error) {
+    console.error('Unhandled error in deleteMultipleProposals:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 export const createProposalPdf = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);

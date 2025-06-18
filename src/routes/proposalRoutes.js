@@ -13,6 +13,7 @@ import {
   downloadProposalPdf,
   uploadProposalWithSignature,
   internalUploadProposalWithSignature,
+  deleteMultipleProposals,
 } from '../controllers/proposalController.js';
 
 router.get('/', getAllProposals);
@@ -36,5 +37,5 @@ router.get('/download-pdf/:url', downloadProposalPdf);
 router.post('/upload-pdf-with-signature', uploadProposalWithSignature);
 
 router.post('/internal-upload-pdf-with-signature/:id', internalUploadProposalWithSignature);
-
+router.post('/delete-multiple', deleteMultipleProposals);
 export default router;

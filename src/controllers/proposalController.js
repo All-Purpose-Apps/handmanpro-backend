@@ -335,6 +335,7 @@ export const createProposalPdf = async (req, res) => {
 
     // Fetch the proposal and populate the client information
     const proposal = req.body.proposal;
+
     let materialList = null;
 
     if (proposal.materialsListId) {
@@ -349,6 +350,21 @@ export const createProposalPdf = async (req, res) => {
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+    if (proposal.client.address === proposal.projectAddress) {
+      firstPage.drawText('SAME', {
+        x: 400,
+        y: 565,
+        size: 20,
+        font: fontRegular,
+        color: rgb(1, 0, 0),
+      });
+    } else {
+      form.getTextField('Work At Address').setText(proposal.projectAddress || 'N/A');
+      form.getTextField('Work At Name').setText(proposal.client.name || 'N/A');
+      form.getTextField('Work At Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
+      form.getTextField('Work At Email').setText(proposal.client.email || 'N/A');
+    }
+
     // **Client Information**
     const clientNameField = form.getTextField('Proposal Name');
     clientNameField.setText(`${proposal.client.name}` || 'N/A');
@@ -359,10 +375,6 @@ export const createProposalPdf = async (req, res) => {
     form.getTextField('Proposal Email').setText(proposal.client.email || 'N/A');
 
     // **Work At Information**
-    form.getTextField('Work At Name').setText(proposal.client.name || 'N/A');
-    form.getTextField('Work At Address').setText(proposal.client.address || 'N/A');
-    form.getTextField('Work At Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
-    form.getTextField('Work At Email').setText(proposal.client.email || 'N/A');
 
     // **Proposal Information**
     firstPage.drawText(proposal.proposalNumber || 'N/A', {

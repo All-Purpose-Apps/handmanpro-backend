@@ -14,7 +14,7 @@ const getLastSynced = async (req, res) => {
     }
     res.json(lastSynced);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
@@ -32,7 +32,7 @@ const updateLastSynced = async (req, res) => {
     const lastSyncedResult = await LastSynced.find();
     res.json(lastSyncedResult);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };

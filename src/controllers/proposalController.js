@@ -361,6 +361,7 @@ export const createProposalPdf = async (req, res) => {
       });
     } else {
       form.getTextField('Work At Address 1').setText(proposal.projectAddress || 'N/A');
+      form.getTextField('Work At Address 2').setText(`${proposal.projectCity}, ${proposal.projectState} ${proposal.projectZip}` || 'N/A');
       form.getTextField('Work At Name').setText(proposal.client.name || 'N/A');
       form.getTextField('Work At Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
       form.getTextField('Work At Email').setText(proposal.client.email || 'N/A');
@@ -371,7 +372,8 @@ export const createProposalPdf = async (req, res) => {
     clientNameField.setText(`${proposal.client.name}` || 'N/A');
     clientNameField.updateAppearances(fontBold);
 
-    form.getTextField('Proposal Address 1').setText(proposal.client.address || 'N/A');
+    form.getTextField('Proposal Address 1').setText(proposal.client.streetAddress || 'N/A');
+    form.getTextField('Proposal Address 2').setText(`${proposal.client.city}, ${proposal.client.state} ${proposal.client.zip}` || 'N/A');
     form.getTextField('Proposal Telephone').setText(formatPhoneNumber(proposal.client.phone) || 'N/A');
     form.getTextField('Proposal Email').setText(proposal.client.email || 'N/A');
 
@@ -431,7 +433,7 @@ export const createProposalPdf = async (req, res) => {
       firstPage.drawText('Materials', {
         x: descriptionX,
         y: startingY - proposal.items.length * lineHeight,
-        size: 16,
+        size: 14,
         font: fontRegular,
         color: rgb(0, 0, 0),
       });
@@ -439,14 +441,14 @@ export const createProposalPdf = async (req, res) => {
       firstPage.drawText(materialList.total ? materialList.total.toFixed(2) : '0.00', {
         x: regularPriceX,
         y: startingY - proposal.items.length * lineHeight,
-        size: 16,
+        size: 14,
         font: fontRegular,
         color: rgb(0, 0, 0),
       });
       firstPage.drawText(materialList.discountTotal ? materialList.discountTotal.toFixed(2) : '0.00', {
         x: discountPriceX,
         y: startingY - proposal.items.length * lineHeight,
-        size: 16,
+        size: 14,
         font: fontRegular,
         color: rgb(0, 0, 0),
       });

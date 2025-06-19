@@ -63,6 +63,10 @@ const proposalSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'MaterialsList',
   },
+  projectFullAddress: {
+    type: String,
+    default: '',
+  },
   projectAddress: {
     type: String,
     default: '',

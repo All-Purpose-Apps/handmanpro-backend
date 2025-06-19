@@ -48,6 +48,10 @@ const materialsListSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Proposal',
   },
+  invoiceId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Invoice',
+  },
 });
 
 materialsListSchema.pre('save', function (next) {

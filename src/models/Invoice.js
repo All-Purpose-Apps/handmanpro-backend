@@ -96,9 +96,13 @@ const invoiceSchema = new Schema({
   token: {
     type: String,
   },
-  materialList: {
+  materialsListId: {
     type: Schema.Types.ObjectId,
     ref: 'MaterialList',
+  },
+  projectFullAddress: {
+    type: String,
+    default: '',
   },
   projectAddress: {
     type: String,

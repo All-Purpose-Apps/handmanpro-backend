@@ -44,6 +44,7 @@ export const listContacts = async (req, res) => {
         const resourceName = contact.resourceName;
         const name = contact.names ? contact.names[0].givenName + ' ' + contact.names[0].familyName : '';
         const givenName = contact.names ? contact.names[0].givenName : '';
+        const middleName = contact.names ? contact.names[0].middleName : '';
         const familyName = contact.names ? contact.names[0].familyName : '';
         const email = contact.emailAddresses ? contact.emailAddresses[0].value : '';
         const phone = contact.phoneNumbers ? contact.phoneNumbers[0].value : '';
@@ -52,7 +53,7 @@ export const listContacts = async (req, res) => {
         const city = contact.addresses ? contact.addresses[0].city : '';
         const state = contact.addresses ? contact.addresses[0].region : '';
         const zip = contact.addresses ? contact.addresses[0].postalCode : '';
-        return { resourceName, name, email, phone, streetAddress, address, city, state, zip, givenName, familyName };
+        return { resourceName, name, email, phone, streetAddress, address, city, state, zip, givenName, middleName, familyName };
       });
 
     res.json(formattedContacts);
@@ -72,12 +73,12 @@ export const createGoogleContact = async (req, res) => {
   const peopleService = google.people({ version: 'v1', auth: oauth2Client });
 
   // Extract contact details from request body
-  const { givenName, familyName, email, phone, address } = req.body;
+  const { givenName, middleName, familyName, email, phone, address } = req.body;
 
   try {
     const response = await peopleService.people.createContact({
       requestBody: {
-        names: [{ givenName, familyName }],
+        names: [{ givenName, middleName, familyName }],
         emailAddresses: email ? [{ value: email }] : undefined,
         phoneNumbers: phone ? [{ value: phone }] : undefined,
         addresses: address ? [{ formattedValue: address }] : undefined,

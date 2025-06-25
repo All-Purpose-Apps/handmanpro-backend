@@ -69,6 +69,7 @@ const updateClient = async (req, res) => {
         names: [
           {
             givenName: client.givenName,
+            middleName: client.middleName,
             familyName: client.familyName,
           },
         ],

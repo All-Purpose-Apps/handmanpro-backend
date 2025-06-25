@@ -57,6 +57,11 @@ const clientSchema = new Schema({
     required: false,
     default: '',
   },
+  middleName: {
+    type: String,
+    required: false,
+    default: '',
+  },
   name: {
     type: String,
     required: true,

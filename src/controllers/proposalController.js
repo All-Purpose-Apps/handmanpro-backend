@@ -461,9 +461,22 @@ export const createProposalPdf = async (req, res) => {
 
     // **Additional Information**
     const customerPrintName = form.getTextField('Customer Print Name');
-    customerPrintName.setText(proposal.client.name || 'N/A');
-    customerPrintName.setFontSize(16);
+    const name = proposal.client.name || 'N/A';
+    let fontSize = 16;
+    let useBold = false;
+
+    if (name.length > 25) {
+      fontSize = 10;
+      useBold = true;
+    } else if (name.length > 18) {
+      fontSize = 12;
+      useBold = true;
+    }
+
+    customerPrintName.setText(name);
+    customerPrintName.setFontSize(fontSize);
     customerPrintName.setAlignment(1);
+    if (useBold) customerPrintName.updateAppearances(fontBold);
 
     // form.getTextField('Date Accepted').setText(proposal.dateAccepted ? new Date(proposal.dateAccepted).toLocaleDateString() : 'N/A');
 

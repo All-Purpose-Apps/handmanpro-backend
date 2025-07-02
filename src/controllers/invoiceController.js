@@ -10,7 +10,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
-import Token from '../models/Token.js';
+import tokenSchema from '../models/Token.js';
 import notificationSchema from '../models/Notification.js';
 import { emitNotification } from '../index.js';
 
@@ -681,6 +681,10 @@ export const createToken = async (req, res) => {
 export const verifyToken = async (req, res) => {
   try {
     const { token } = req.body;
+    const decoded = jwt.decode(token);
+    const tenantId = decoded?.tenantId;
+    const db = await getTenantDb(tenantId);
+    const Token = db.models.Token || db.model('Token', tokenSchema);
 
     // Find the token in the global Token collection
     const tokenDoc = await Token.findOne({ token });

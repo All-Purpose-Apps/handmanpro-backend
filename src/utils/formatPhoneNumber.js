@@ -1,4 +1,4 @@
-export function formatPhoneNumber(input) {
+function formatPhoneNumber(input) {
   // Remove all non-numeric characters
   const cleaned = input.replace(/\D/g, '');
 
@@ -21,3 +21,5 @@ export function formatPhoneNumber(input) {
 
   return formatted;
 }
+
+export { formatPhoneNumber };

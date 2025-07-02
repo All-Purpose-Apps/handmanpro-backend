@@ -1,33 +1,21 @@
 import { emitNotification } from '../index.js';
 import { getTenantDb } from '../config/db.js';
-import proposalSchema from '../models/Proposal.js';
-
+import { getModels, formatPhoneNumber } from '../utils/index.js';
 import jwt from 'jsonwebtoken';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { PassThrough } from 'stream';
 import { Storage } from '@google-cloud/storage';
-import { formatPhoneNumber } from '../utils/formatPhoneNumber.js';
-import clientSchema from '../models/Client.js';
-import materialsListSchema from '../models/MaterialsList.js';
-import mongoose from 'mongoose';
 import fs from 'fs-extra';
 import path from 'path';
 import fetch from 'node-fetch';
-import notificationSchema from '../models/Notification.js';
-import Token from '../models/Token.js';
-const tokenSchema = new mongoose.Schema({
-  token: { type: String, required: true },
-  expiresAt: { type: Date, required: true }, // Set expiration time
-  revoked: { type: Boolean, default: false }, // Flag for revocation
-});
 
 // Create a new proposal
 export const createProposal = async (req, res) => {
   try {
+    // Connect to the tenant-specific database
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema).populate('client');
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const { Proposal, Client, Notification } = getModels(db);
+    // Validate the request body
     const proposal = new Proposal(req.body);
     await proposal.save();
 
@@ -68,7 +56,7 @@ export const createProposal = async (req, res) => {
 export const getAllProposals = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const { Proposal } = getModels(db);
     const proposals = await Proposal.find({}).populate('client');
     res.status(200).send(proposals);
   } catch (error) {
@@ -81,7 +69,7 @@ export const getAllProposals = async (req, res) => {
 export const getProposalById = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const { Proposal } = getModels(db);
     const proposal = await Proposal.findById(req.params.id).populate('client');
     if (!proposal) {
       return res.status(404).send();
@@ -98,8 +86,7 @@ export const getProposalById = async (req, res) => {
 export const updateProposal = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
+    const { Proposal, Client } = getModels(db);
     const proposalId = req.params.id;
     const updateData = req.body;
 
@@ -146,10 +133,7 @@ export const updateProposal = async (req, res) => {
 export const deleteProposal = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const { Proposal, Client, MaterialsList, Notification } = getModels(db);
     const proposal = await Proposal.findById(req.params.id).populate('client');
     if (!proposal) {
       return res.status(404).send();
@@ -230,10 +214,7 @@ export const deleteMultipleProposals = async (req, res) => {
     }
 
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const { Proposal, Client, MaterialsList, Notification } = getModels(db);
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
     const storage = new Storage({ credentials: gcsCredentials });
@@ -302,10 +283,7 @@ export const deleteMultipleProposals = async (req, res) => {
 export const createProposalPdf = async (req, res) => {
   try {
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const MaterialsList = db.models.MaterialsList || db.model('MaterialsList', materialsListSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const { Proposal, Client, MaterialsList, Notification } = getModels(db);
     // Parse credentials from environment variable
     const gcsCredentialsBase64 = process.env.GCS_CREDENTIALS_BASE64;
     const gcsCredentials = JSON.parse(Buffer.from(gcsCredentialsBase64, 'base64').toString('utf8'));
@@ -544,7 +522,7 @@ export const createProposalToken = async (req, res) => {
     const decoded = jwt.decode(data.token || '', { complete: false });
     const tenantId = decoded?.tenantId || req.tenantId;
     const db = await getTenantDb(tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
+    const { Proposal, Token } = getModels(db);
     // Use the global Token model, already imported at the top
     const proposal = await Proposal.findById(proposalId);
     if (!proposal) {
@@ -555,6 +533,7 @@ export const createProposalToken = async (req, res) => {
       proposalNumber: proposal.proposalNumber,
       proposalUrl,
       signed: false,
+      revoked: false,
       tenantId, // Include tenantId in the payload
     };
 
@@ -578,9 +557,13 @@ export const createProposalToken = async (req, res) => {
 export const verifyProposalToken = async (req, res) => {
   try {
     const { token } = req.body;
+    const decoded = jwt.decode(token);
+    const tenantId = decoded?.tenantId;
+    const db = await getTenantDb(tenantId);
+    const { Token } = getModels(db);
 
     // Use the global Token model, already imported at the top
-    const tokenDoc = await Token.findOne({ token });
+    const tokenDoc = await Token.findOne({ token: token });
 
     if (!tokenDoc) {
       return res.status(401).json({ message: 'Invalid token' });
@@ -592,10 +575,7 @@ export const verifyProposalToken = async (req, res) => {
       return res.status(401).json({ message: 'Token has expired' });
     }
     // After verifying the token, derive tenantId and get tenant DB context
-    const decoded = jwt.decode(token);
-    const tenantId = decoded?.tenantId;
 
-    const db = await getTenantDb(tenantId);
     // Optionally use Proposal model if needed after verification
     jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decodedPayload) => {
       if (err) {
@@ -613,14 +593,16 @@ export const revokeProposalToken = async (req, res) => {
   try {
     const { token } = req.body;
     // Use the global Token model, already imported at the top
-    const tokenDoc = await Token.findOne({ token });
-    if (!tokenDoc) {
-      return res.status(404).json({ message: 'Token not found' });
-    }
+
     // Derive tenantId from token and get tenant DB context
     const decoded = jwt.decode(token);
     const tenantId = decoded?.tenantId;
     const db = await getTenantDb(tenantId);
+    const { Token } = getModels(db);
+    const tokenDoc = await Token.findOne({ token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
     // Optionally use Proposal model if needed after revocation
     tokenDoc.revoked = true;
     await tokenDoc.save();
@@ -637,10 +619,6 @@ export const downloadProposalPdf = async (req, res) => {
     // Extract tenantId from the token before loading the proposal model
     // Use the global Token model, already imported at the top
     const token = req.headers.authorization?.split(' ')[1];
-    const tokenDoc = await Token.findOne({ token: token });
-    if (!tokenDoc) {
-      return res.status(404).json({ message: 'Token not found' });
-    }
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
@@ -649,6 +627,12 @@ export const downloadProposalPdf = async (req, res) => {
     }
     const tenantId = decoded.tenantId;
     const db = await getTenantDb(tenantId);
+    const { Token } = getModels(db);
+    const tokenDoc = await Token.findOne({ token: token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
+
     const url = Object.keys(req.query);
     if (!url) {
       return res.status(400).send('Missing PDF URL');
@@ -685,21 +669,21 @@ export const uploadProposalWithSignature = async (req, res) => {
     // Extract token from Authorization header
     const token = req.body.token;
 
-    const tokenDoc = await Token.findOne({ token: token });
-    if (!tokenDoc) {
-      return res.status(404).json({ message: 'Token not found' });
-    }
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     } catch (err) {
       return res.status(401).json({ message: 'Invalid token' });
     }
+
     const tenantId = decoded.tenantId;
     const db = await getTenantDb(tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
+    const { Proposal, Client, Token, Notification } = getModels(db);
+
+    const tokenDoc = await Token.findOne({ token: token });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: 'Token not found' });
+    }
     const { pdfUrl, signatureImage, proposalNumber, proposalId } = req.body;
 
     const proposal = await Proposal.findById(proposalId).populate('client');
@@ -809,10 +793,7 @@ export const internalUploadProposalWithSignature = async (req, res) => {
     }
 
     const db = await getTenantDb(req.tenantId);
-    const Proposal = db.models.Proposal || db.model('Proposal', proposalSchema);
-    const Client = db.models.Client || db.model('Client', clientSchema);
-    const Notification = db.models.Notification || db.model('Notification', notificationSchema);
-
+    const { Proposal, Client, Notification } = getModels(db);
     const proposal = await Proposal.findById(proposalId).populate('client');
     if (!proposal) {
       return res.status(404).json({ message: 'Proposal not found' });

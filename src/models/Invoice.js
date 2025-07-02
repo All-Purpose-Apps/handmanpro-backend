@@ -120,6 +120,10 @@ const invoiceSchema = new Schema({
     type: String,
     default: '',
   },
+  token: {
+    type: String,
+    default: '',
+  },
 });
 
 // Automatically update updatedAt when document is changed

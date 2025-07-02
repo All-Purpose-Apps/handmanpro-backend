@@ -84,6 +84,10 @@ const proposalSchema = new Schema({
     type: String,
     default: '',
   },
+  token: {
+    type: String,
+    default: '',
+  },
 });
 
 proposalSchema.pre('save', function (next) {

@@ -638,6 +638,7 @@ export const createToken = async (req, res) => {
     const tenantId = decoded?.tenantId || req.tenantId;
     const db = await getTenantDb(tenantId);
     const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
+    const Token = db.models.Token || db.model('Token', tokenSchema);
     // Find the invoice by ID
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {

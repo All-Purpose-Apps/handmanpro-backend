@@ -22,72 +22,66 @@ export const getFilesFromBucket = async (req, res) => {
       prefix: `${req.tenantId}/`,
     });
 
-    // if (files.length === 0) {
-    //   return res.status(404).json({ message: 'No files found in the bucket' });
-    // }
-    // // If you want to return all files without organizing them into folders
-    // const fileList = await Promise.all(
-    //   files.map(async (file) => {
-    //     const [url] = await file.getSignedUrl({
-    //       action: 'read',
-    //       expires: Date.now() + 15 * 60 * 1000, // URL valid for 15 minutes
-    //     });
-
-    //     return {
-    //       name: file.name,
-    //       size: file.metadata.size,
-    //       contentType: file.metadata.contentType,
-    //       updated: file.metadata.updated,
-    //       url,
-    //       isFolder: file.name.endsWith('/'),
-    //     };
-    //   })
-    // );
-
-    // res.json(fileList);
+    if (files.length === 0) {
+      return res.status(200).json([]);
+    }
 
     const tenantPrefix = `${req.tenantId}/`;
-    const folderSet = new Set();
-    const folderMap = new Map();
+    const directoriesSet = new Set();
+    const result = [];
 
-    const fileList = await Promise.all(
-      files.map(async (file) => {
+    // Process files and extract directories
+    for (const file of files) {
+      const relativePath = file.name.substring(tenantPrefix.length);
+      const pathParts = relativePath.split('/');
+
+      // Add all directory levels to the set
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const dirPath = '/' + pathParts.slice(0, i + 1).join('/');
+        directoriesSet.add(dirPath);
+      }
+
+      // Add the file itself if it's not empty (not just a directory marker)
+      if (!file.name.endsWith('/') && pathParts[pathParts.length - 1]) {
+        const fileName = pathParts[pathParts.length - 1];
+        const filePath = '/' + relativePath;
+
+        // Generate signed URL for direct access
         const [url] = await file.getSignedUrl({
           action: 'read',
-          expires: Date.now() + 15 * 60 * 1000,
+          expires: Date.now() + 15 * 60 * 1000, // URL valid for 15 minutes
         });
 
-        const fileData = {
-          name: file.name,
-          size: file.metadata.size,
+        result.push({
+          name: fileName,
+          isDirectory: false,
+          path: filePath,
+          updatedAt: file.metadata.updated,
+          size: parseInt(file.metadata.size),
           contentType: file.metadata.contentType,
-          updated: file.metadata.updated,
-          url,
-          isFolder: file.name.endsWith('/'),
-        };
-
-        const relativePath = file.name.substring(tenantPrefix.length);
-        const parts = relativePath.split('/');
-        if (parts.length > 1) {
-          const folderName = parts[0];
-          folderSet.add(folderName);
-          if (!folderMap.has(folderName)) folderMap.set(folderName, []);
-          folderMap.get(folderName).push(fileData);
-        } else {
-          if (!folderMap.has('root')) folderMap.set('root', []);
-          folderMap.get('root').push(fileData);
-        }
-
-        return fileData;
-      })
-    );
-
-    const folders = Array.from(folderSet);
-    const organized = {};
-    for (const [folder, contents] of folderMap.entries()) {
-      organized[folder] = contents;
+          url: url,
+        });
+      }
     }
-    res.json({ folders, organized, allFiles: fileList });
+
+    // Add directories to result
+    for (const dirPath of directoriesSet) {
+      const dirName = dirPath.split('/').pop();
+      result.push({
+        name: dirName,
+        isDirectory: true,
+        path: dirPath,
+        updatedAt: new Date().toISOString(), // Use current time for directories
+      });
+    }
+
+    // Sort result: directories first, then files, both alphabetically
+    result.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    res.json(result);
   } catch (error) {
     console.error('Error listing files from bucket:', error.message);
     res.status(500).json({ error: 'Failed to list files from bucket' });

@@ -26,6 +26,10 @@ const proposalSchema = new Schema({
       discountPrice: {
         type: Number,
       },
+      materialListId: {
+        type: Schema.Types.ObjectId,
+        ref: 'MaterialsList',
+      },
     },
   ],
   packagePrice: {
@@ -35,7 +39,17 @@ const proposalSchema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ['draft', 'sent to client', 'accepted', 'rejected', 'converted to invoice', 'proposal pdf created'],
+    enum: [
+      'draft',
+      'sent to client',
+      'accepted',
+      'rejected',
+      'converted to invoice',
+      'proposal pdf created',
+      'working on project',
+      'paid deposit',
+      'finished project',
+    ],
     default: 'draft',
   },
   dateAccepted: {
@@ -58,11 +72,6 @@ const proposalSchema = new Schema({
   invoiceId: {
     type: Schema.Types.ObjectId,
     ref: 'Invoice',
-  },
-  materialsListId: {
-    type: Schema.Types.ObjectId,
-    ref: 'MaterialsList',
-    default: null,
   },
   projectFullAddress: {
     type: String,

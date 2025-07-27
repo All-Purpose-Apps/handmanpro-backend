@@ -441,6 +441,7 @@ export const downloadInvoicePdf = async (req, res) => {
   try {
     // Extract tenantId from the token before loading the invoice model
     const token = req.headers.authorization?.split(' ')[1];
+    const Token = db.models.Token || db.model('Token', tokenSchema);
     const tokenDoc = await Token.findOne({ token: token });
     if (!tokenDoc) {
       return res.status(404).json({ message: 'Token not found' });
@@ -520,6 +521,7 @@ export const uploadPdfWithSignature = async (req, res) => {
     const db = await getTenantDb(tenantId);
     const Invoice = db.models.Invoice || db.model('Invoice', invoiceSchema);
     const Client = db.models.Client || db.model('Client', clientSchema);
+    const Token = db.models.Token || db.model('Token', tokenSchema);
     const Notification = db.models.Notification || db.model('Notification', notificationSchema);
     const { pdfUrl, signatureImage, invoiceNumber, invoiceId } = req.body;
 
